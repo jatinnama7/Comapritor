@@ -17,6 +17,7 @@ import { AnimatedText } from "../Components/AnimatedText";
 
 const Home = () => {
   return (
+    
     <div className="scroll-container">
       <section className="home-hero-section">
         <Navbar />
@@ -30,8 +31,9 @@ const Home = () => {
             hoverEffect={true}
           >
             Compare Smarter<br />Shop Better
+        
           </AnimatedText>
-            
+            <img src={phones} alt="Promotional2" className="promo-image3" />
  
             <div className="info-banner">
               <span role="img" aria-label="waving hand">👋</span>
@@ -43,7 +45,7 @@ const Home = () => {
         </div>
             <img src={game} alt="Promotional" className="promo-image" /> 
             <img src={headphone} alt="Promotional1" className="promo-image2" />
-            <img src={phones} alt="Promotional2" className="promo-image3" />
+            {/* <img src={phones} alt="Promotional2" className="promo-image3" /> */}
              <img src={earbuds} alt="Promotional3" className="promo-image4" />
              <img src={study} alt="Promotional4" className="promo-image5" />
              <img src={shop} alt="Promotional5" className="promo-image6" />
