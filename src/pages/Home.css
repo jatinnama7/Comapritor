@@ -3,6 +3,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
+  
 }
 
 /* Scroll Container */
@@ -87,6 +88,7 @@ section {
   font-weight: 500;
   margin-top: 21rem;
   height: 9px;
+  z-index: 5;
 }
 
 
@@ -192,12 +194,203 @@ section {
 .page2-section {
   background-color: #ffffff;
 }
-.promo-image {
-  max-width: 33%;
+/* .promo-image {
+  max-width: 5%;
   height: auto;
-  margin-left: -40px;
-  margin-top: 300px;
+  margin-left: 1300px;
+  margin-top: 400px;
   transform: rotate(-15deg);
   position: fixed;
   z-index: -1;
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0% { transform: rotate(-15deg) translateY(0); }
+  50% { transform: rotate(-15deg) translateY(-5px); }
+  100% { transform: rotate(-15deg) translateY(0); }
+}
+.promo-image2 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 12px;
+  margin-top: 319px;
+  position: fixed;
+  z-index: -1;
+  animation: float 3s ease-in-out infinite;
+}
+
+.promo-image3 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 190px;
+  margin-top: 509px;
+  position: fixed;
+  z-index: -1;
+  animation: float 3s ease-in-out infinite;
+}
+
+.promo-image4 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 19px;
+  margin-top: 609px;
+  position: fixed;
+  z-index: -1;
+  animation: float 3s ease-in-out infinite;
+}
+
+.promo-image5 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 1400px;
+  margin-top: 600px;
+  position: fixed;
+  z-index: -1;
+   transform: rotate(15deg);
+   animation: float2 3s ease-in-out infinite;
+}
+@keyframes float2 { 
+  0% { transform: rotate(15deg) translateY(0); }
+  50% { transform:rotate(15deg) translateY(-5px); }
+  100% { transform:rotate(15deg) translateY(0); }
+}
+
+.promo-image6 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 1200px;
+  margin-top: 650px;
+  position: fixed;
+  z-index: -1;
+   transform: rotate(15deg);
+   animation: float2 3s ease-in-out infinite;
+}
+@keyframes float2 { 
+  0% { transform: rotate(15deg) translateY(0); }
+  50% { transform:rotate(15deg) translateY(-5px); }
+  100% { transform:rotate(15deg) translateY(0); }
+} 
+  
+.promo-image7 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 1200px;
+  margin-top: 650px;
+  position: fixed;
+  z-index: -1;
+   transform: rotate(15deg);
+   animation: float2 3s ease-in-out infinite;
+}
+
+.promo-image8 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 1200px;
+  margin-top: 650px;
+  position: fixed;
+  z-index: -1;
+   transform: rotate(15deg);
+   animation: float2 3s ease-in-out infinite;
+}
+*/
+/* Left Float Animation */
+@keyframes float-left {
+  0% { transform: rotate(-15deg) translateY(0); }
+  50% { transform: rotate(-15deg) translateY(-5px); }
+  100% { transform: rotate(-15deg) translateY(0); }
+}
+
+/* Right Float Animation */
+@keyframes float-right {
+  0% { transform: rotate(15deg) translateY(0); }
+  50% { transform: rotate(15deg) translateY(-5px); }
+  100% { transform: rotate(15deg) translateY(0); }
+}
+
+/* Image 1 */
+.promo-image {
+  max-width: 5%;
+  height: auto;
+  margin-left: 82vw;
+  margin-top: 10vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-left 3s ease-in-out infinite;
+}
+
+/* Image 2 */
+.promo-image2 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 6vw;
+  margin-top: 25vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-right 3.2s ease-in-out infinite;
+}
+
+/* Image 3 */
+.promo-image3 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 18vw;
+  margin-top: 70vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-left 2.9s ease-in-out infinite;
+}
+
+/* Image 4 */
+.promo-image4 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 3vw;
+  margin-top: 85vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-right 3.1s ease-in-out infinite;
+}
+
+/* Image 5 */
+.promo-image5 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 92vw;
+  margin-top: 75vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-right 3.4s ease-in-out infinite;
+}
+
+/* Image 6 */
+.promo-image6 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 70vw;
+  margin-top: 85vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-left 3s ease-in-out infinite;
+}
+
+/* Image 7 */
+.promo-image7 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 55vw;
+  margin-top: 15vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-right 3.3s ease-in-out infinite;
+}
+
+/* Image 8 */
+.promo-image8 {
+  max-width: 5%;
+  height: auto;
+  margin-left: 42vw;
+  margin-top: 45vh;
+  position: fixed;
+  z-index: -1;
+  animation: float-left 2.8s ease-in-out infinite;
 }

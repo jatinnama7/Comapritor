@@ -1,3 +1,6 @@
+html, body {
+  overflow-x: hidden;
+}
 .page2-container {
   height: 100vh;
   scroll-snap-align: start;
@@ -8,5 +11,5 @@
   background-color: #7e83dd;
   color: #333;
   text-align: center;
-  width:1546px; 
+  width:1545px; 
 }
