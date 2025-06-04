@@ -294,3 +294,55 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: default;
 }
+
+.otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.otp-box {
+  width: 45px;
+  height: 45px;
+  font-size: 20px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background-color: #fff;
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.otp-box:focus {
+  box-shadow: 0 0 5px rgba(45, 160, 168, 0.7);
+  border-color: #2da0a8;
+}
+
+.password-with-button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.send-otp-btn {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: none;
+  background-color: #2da0a8;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.send-otp-btn:hover {
+  background-color: #258c94;
+}
+
+.otp-message {
+  margin: 10px 0;
+  color: green;
+  font-size: 14px;
+  text-align: center;
+}
