@@ -6,6 +6,7 @@ import Page1 from './pages/Page1';
 import Home from './pages/Home';
 import Navbar from './pages/Navbar';
 import Page2 from './pages/Page2';
+import Search from './pages/Search';
 
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/page1" element={<Page1 />} />
       <Route path="/page2" element={<Page2 />} />
+      <Route path="/search" element={<Search/>}/>
 
     </Routes>
   );
