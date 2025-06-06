@@ -15,13 +15,10 @@
     "@tailwindcss/vite": "^4.1.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-<<<<<<< HEAD
     "framer-motion": "^12.12.1",
-=======
-    "framer-motion": "^12.16.0",
->>>>>>> 3e66784 (update the files)
     "lucide-react": "^0.513.0",
     "motion": "^12.12.1",
+    "postprocessing": "^6.37.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.55.0",
@@ -29,6 +26,7 @@
     "react-router-dom": "^7.6.2",
     "styled-components": "^6.1.17",
     "tailwind-merge": "^3.3.0",
+    "three": "^0.176.0",
     "yup": "^1.6.1"
   },
   "devDependencies": {
@@ -36,6 +34,7 @@
     "@types/node": "^22.15.29",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/three": "^0.177.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.21.0",
