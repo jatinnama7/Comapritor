@@ -189,7 +189,7 @@ const Home = () => {
     if (e.key === "Enter" && query.trim()) {
       setFadeOut(true); // trigger fade out
       setTimeout(() => {
-        navigate(`/search?query=${encodeURIComponent(query.trim())}`);
+        navigate(`/loading?query=${encodeURIComponent(query.trim())}`);
       }, 800); // 2 second delay
     }
   }
