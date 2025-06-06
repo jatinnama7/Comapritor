@@ -24,7 +24,7 @@ const Loading = () => {
       setTimeout(() => {
         navigate(`/search?query=${encodeURIComponent(query || "")}`);
       }, 800); // match fade-out duration
-    }, 15550);
+    }, 15565);
 
     return () => {
       clearTimeout(timer);
