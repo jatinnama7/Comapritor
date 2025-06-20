@@ -13,7 +13,7 @@ const Button = () => {
 
   return (
     <StyledWrapper>
-      <button className="glow-on-hover" type="button" onClick={handleClick}>
+      <button className="login-btn"  type="button" onClick={handleClick}>
         Login
       </button>
     </StyledWrapper>

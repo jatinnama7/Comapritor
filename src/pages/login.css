@@ -7,7 +7,6 @@
   font-family: 'Montserrat', sans-serif;
 }
 
-/* NEW WRAPPER TO CENTER EVERYTHING */
 .wrapper {
   height: 100vh;
   width: 100vw;
@@ -25,7 +24,7 @@
   overflow: hidden;
   width: 768px;
   max-width: 100%;
-  min-height: 480px;
+  min-height: 560px;
 }
 
 .container p {
@@ -103,6 +102,7 @@
   width: 100%;
   outline: none;
   transition: all 0.3s ease-in-out;
+  
 }
 
 .container input:hover,
@@ -180,6 +180,28 @@
 .social-icons a i:hover {
   animation: bounce 0.6s;
 }
+
+
+input::placeholder {
+  color: black;
+}
+
+input::-webkit-input-placeholder {
+  color: black;
+}
+
+input::-moz-placeholder {
+  color: black;
+}
+
+input:-ms-input-placeholder {
+  color: black;
+}
+
+input::-ms-input-placeholder {
+  color: black;
+}
+
 
 @keyframes bounce {
   0%   { transform: translateY(0); }
@@ -265,13 +287,11 @@
 }
 
 
-/* Hover effect for the outer wrapper */
 .wrapper:hover .container {
   box-shadow: 0 8px 25px rgba(45, 160, 168, 0.6);
   transform: scale(1.01);
   transition: all 0.3s ease-in-out;
 }
-/* Specific styles for form headers and spans */
 .form-container h1 {
   color: black;
   transition: all 0.3s ease;
@@ -282,15 +302,14 @@
   transition: all 0.3s ease;
 }
 
-/* Hover effects */
 .form-container h1:hover {
-  color: #1e7c85; /* Darker blue on hover */
+  color: #1e7c85;    
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transform: scale(1.02);
 }
 
 .form-container span:hover {
-  color: #1e7c85; /* Darker blue on hover */
+  color: #1e7c85; 
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: default;
 }
@@ -323,6 +342,11 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  width: 304px;
+}
+
+.phone-input{
+  width:304px;
 }
 
 .send-otp-btn {
@@ -331,7 +355,6 @@
   border: none;
   background-color: #2da0a8;
   color: white;
-  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -341,8 +364,9 @@
 }
 
 .otp-message {
-  margin: 10px 0;
   color: green;
   font-size: 14px;
   text-align: center;
+  margin-top: 20px;
 }
+

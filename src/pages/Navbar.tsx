@@ -1,6 +1,6 @@
 import { FaGlobe } from 'react-icons/fa';
 import "tailwindcss";
-import Button from '../Components/Button'; // Import the Button component
+import Button from './Button'; // Import the Button component
 import './Navbar.css';
 
 

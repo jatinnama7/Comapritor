@@ -1,10 +1,10 @@
 import { Route, Routes } from 'react-router-dom';
-import Button from './Components/Button';
+import Button from './pages/Button';
 
-import Login from './Components/Login';
-import Page1 from './pages/Page1';
 import Home from './pages/Home';
+import Login from './pages/Login';
 import Navbar from './pages/Navbar';
+import Page1 from './pages/Page1';
 import Page2 from './pages/Page2';
 import Search from './pages/Search';
 import Loading from './pages/loading';
