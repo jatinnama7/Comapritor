@@ -12,6 +12,7 @@ import Product from './pages/Product';
 import Compared from './pages/Compared';
 import Productlist from './pages/Productlist';
 
+
 function App() {
   return (
     <Routes>
@@ -26,6 +27,8 @@ function App() {
       <Route path="/product"element={<Product/>}/>
       <Route path="/compared"element={<Compared/>}/>
       <Route path="/list"element={<Productlist/>}/>
+
+
     </Routes>
   );
 }

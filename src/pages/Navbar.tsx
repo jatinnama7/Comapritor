@@ -57,8 +57,6 @@ import introVideo from "../assets/intro.mp4"; // adjust path if needed
 import { Home, User, Briefcase, FileText } from 'lucide-react'
 import { NavBar } from "@/Components/ui/tubelight-navbar"
 
-
-
 const Navbar = () => {
   const [showVideo, setShowVideo] = useState(false);
 
