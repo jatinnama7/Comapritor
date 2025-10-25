@@ -23,7 +23,7 @@
   position: relative;
   overflow: hidden;
   /* width: 768px; */
-    width: 700px !important;
+  width: 700px !important;
   min-height: 560px;
 }
 
@@ -303,7 +303,7 @@ input::-ms-input-placeholder {
 }
 
 .form-container h1:hover {
-  color: #1e7c85;    
+  color: #1e7c85;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transform: scale(1.02);
 }

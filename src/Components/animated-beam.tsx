@@ -250,6 +250,8 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
     return () => clearTimeout(timeout);
   }, [delay, duration, onAnimationComplete]);
 
+
+  // Calculate the gradient coordinates based on the reverse prop
   const gradientCoordinates = reverse
     ? {
         x1: ["90%", "-10%"],
@@ -263,7 +265,6 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
         y1: ["0%", "0%"],
         y2: ["0%", "0%"],
       };
-
   useEffect(() => {
     const updatePath = () => {
       if (containerRef.current && fromRef.current && toRef.current) {

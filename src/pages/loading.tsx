@@ -24,7 +24,7 @@ const Loading = () => {
       setTimeout(() => {
         navigate(`/product?query=${encodeURIComponent(query || "")}`);
         // navigate(`/search?query=${encodeURIComponent(query || "")}`);
-      }, 800); // match fade-out duration
+ }, 800); // match fade-out duration
     }, 15568);
 
     return () => {
