@@ -366,6 +366,7 @@ import watch from '../assets/watch.png';
 
 import { AnimatedText } from "../Components/AnimatedText";
 
+
 const Home = () => {
   const [query, setQuery] = useState("");
   const [fadeOut, setFadeOut] = useState(false);
