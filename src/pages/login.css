@@ -347,6 +347,7 @@ input::-ms-input-placeholder {
 
 .phone-input{
   width:304px;
+
 }
 
 .send-otp-btn {
@@ -355,6 +356,8 @@ input::-ms-input-placeholder {
   border: none;
   background-color: #2da0a8;
   color: white;
+  border-radius: 8px;
+
   cursor: pointer;
   white-space: nowrap;
 }
@@ -368,5 +371,8 @@ input::-ms-input-placeholder {
   font-size: 14px;
   text-align: center;
   margin-top: 20px;
+  margin: 10px 0;
+  color: green;
+  font-size: 14px;
+  text-align: center;
 }
-
