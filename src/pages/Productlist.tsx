@@ -17,7 +17,6 @@ const Productlist: React.FC = () => {
         fontSize: '24px',
       }}
     >
-      This is an empty React page.
     </div>
     
   );

@@ -180,7 +180,12 @@ FuturisticProductCardProps) => {
       rotationFactor={8}
       isRevese
       springOptions={{ stiffness: 26.7, damping: 4.1, mass: 0.2 }}
-      className={`group w-full max-w-sm mx-auto ${className}`}
+      className={`group  mx-auto ${className}`}
+      style={{
+      width: "362px",   // 👈 your custom width
+      height: "420px",  // 👈 your custom height
+      fontSize: "0.9rem",
+}}
     >
       <motion.div
         className="relative w-full h-full overflow-hidden rounded-2xl bg-black border border-gray-800 flex flex-col"
@@ -285,10 +290,10 @@ FuturisticProductCardProps) => {
         </div>
 
         {/* Content Section */}
-        <div className="relative p-6 z-20 flex-grow flex flex-col">
-          {product.rating && (
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex items-center gap-1">
+        <div className="relative p-4 z-20 flex-grow flex flex-col gap-2"style={{ marginLeft: '6px'  }}>
+        {product.rating && (
+        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-1">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
@@ -355,14 +360,14 @@ FuturisticProductCardProps) => {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4" style={{ marginTop: '1px' }}>
             {getAvailabilityIcon()}
             <span className={`text-sm font-medium capitalize ${getAvailabilityColor()}`}>
               {product.availability}
             </span>
           </div>
 
-          <div className="flex items-center justify-between mt-auto">
+          <div className="flex items-center justify-between mt-auto" style={{ marginTop: '7px' }}>
             <motion.div
               className="text-2xl font-bold text-white"
               initial={{ opacity: 0 }}
@@ -373,14 +378,16 @@ FuturisticProductCardProps) => {
             </motion.div>
 
             <motion.button
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg"
+              className=" flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8 }}
+              style={{ margin: '10px' }}
+              
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-4 h-4"  />
               Add to Cart
             </motion.button>
           </div>

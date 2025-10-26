@@ -127,7 +127,10 @@ const Product: React.FC = () => {
               {/* Cards */}
               <div className="flex gap-10" style={{ marginBottom: "4rem" }}>
                 {[0, 1, 2].map((index) => (
-                  <div key={index} ref={cardRefs[index]}>
+                  <div 
+                  key={index} 
+                  ref={cardRefs[index]}
+                  >
                     <FuturisticProductCard
                       isSelected={selectedCardIndexes.includes(index)}
                       onSelect={(selected) => handleSelect(index, selected)}
