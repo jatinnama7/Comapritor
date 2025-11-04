@@ -18,12 +18,12 @@
 
 .container {
   background-color: #fff;
-  border-radius: 30px;
+  border-radius: 40px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
   position: relative;
   overflow: hidden;
-  width: 768px;
-  max-width: 100%;
+  /* width: 768px; */
+  width: 700px !important;
   min-height: 560px;
 }
 
@@ -303,7 +303,7 @@ input::-ms-input-placeholder {
 }
 
 .form-container h1:hover {
-  color: #1e7c85;    
+  color: #1e7c85;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transform: scale(1.02);
 }
@@ -342,11 +342,12 @@ input::-ms-input-placeholder {
   display: flex;
   gap: 10px;
   align-items: center;
-  width: 304px;
+  width: 269px;
 }
 
 .phone-input{
   width:304px;
+
 }
 
 .send-otp-btn {
@@ -355,6 +356,8 @@ input::-ms-input-placeholder {
   border: none;
   background-color: #2da0a8;
   color: white;
+  border-radius: 8px;
+
   cursor: pointer;
   white-space: nowrap;
 }
@@ -368,5 +371,8 @@ input::-ms-input-placeholder {
   font-size: 14px;
   text-align: center;
   margin-top: 20px;
+  margin: 10px 0;
+  color: green;
+  font-size: 14px;
+  text-align: center;
 }
-

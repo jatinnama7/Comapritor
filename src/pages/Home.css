@@ -3,6 +3,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
+   scrollbar-width: none;
   
 }
 
@@ -311,7 +312,7 @@ section {
 
 /* Image 1 */
 .promo-image {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 82vw;
   margin-top: 10vh;
@@ -322,7 +323,7 @@ section {
 
 /* Image 2 */
 .promo-image2 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 6vw;
   margin-top: 25vh;
@@ -333,7 +334,7 @@ section {
 
 /* Image 3 */
 .promo-image3 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: -32vw;
   margin-top: 50vh;
@@ -344,7 +345,7 @@ section {
 
 /* Image 4 */
 .promo-image4 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 3vw;
   margin-top: 85vh;
@@ -355,7 +356,7 @@ section {
 
 /* Image 5 */
 .promo-image5 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 92vw;
   margin-top: 75vh;
@@ -366,7 +367,7 @@ section {
 
 /* Image 6 */
 .promo-image6 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 70vw;
   margin-top: 85vh;
@@ -377,7 +378,7 @@ section {
 
 /* Image 7 */
 .promo-image7 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 55vw;
   margin-top: 15vh;
@@ -388,7 +389,7 @@ section {
 
 /* Image 8 */
 .promo-image8 {
-  max-width: 5%;
+  max-width: 6%;
   height: auto;
   margin-left: 42vw;
   margin-top: 45vh;

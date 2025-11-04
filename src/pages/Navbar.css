@@ -6,7 +6,7 @@
     align-items: center;
     margin-top: 30px;
     position: fixed;
-    top: -23px;
+    top: -27px;
     left: 0;
     right: 0;
     z-index: 1000;
@@ -15,7 +15,8 @@
   .navbar-left {
     display: flex;
     align-items: center;
-    gap: 52px;
+    gap: 48px;
+    margin-left: -112px;
   }
 
   /* src/pages/Navbar.css */
@@ -32,6 +33,7 @@
   
   .logo {
     height: 32px;
+    
   }
   
   .nav-link {

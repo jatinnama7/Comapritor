@@ -8,6 +8,9 @@ import Page1 from './pages/Page1';
 import Page2 from './pages/Page2';
 import Search from './pages/Search';
 import Loading from './pages/loading';
+import Product from './pages/Product';
+import Compared from './pages/Compared';
+import Productlist from './pages/Productlist';
 
 
 function App() {
@@ -21,6 +24,10 @@ function App() {
       <Route path="/page2" element={<Page2 />} />
       <Route path="/search" element={<Search/>}/>
       <Route path="/loading"element={<Loading/>}/>
+      <Route path="/product"element={<Product/>}/>
+      <Route path="/compared"element={<Compared/>}/>
+      <Route path="/list"element={<Productlist/>}/>
+
 
     </Routes>
   );

@@ -22,8 +22,9 @@ const Loading = () => {
     const timer = setTimeout(() => {
       setFadeOut(true);
       setTimeout(() => {
-        navigate(`/search?query=${encodeURIComponent(query || "")}`);
-      }, 800); // match fade-out duration
+        navigate(`/product?query=${encodeURIComponent(query || "")}`);
+        // navigate(`/search?query=${encodeURIComponent(query || "")}`);
+ }, 800); // match fade-out duration
     }, 15568);
 
     return () => {
