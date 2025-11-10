@@ -3,3 +3,6 @@
 /Scraper/scrape_env
 /Scraper/__pycache__/
 node_modules/
+
+# Logs
+*.log
