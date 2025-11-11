@@ -23,30 +23,28 @@ It uses:
 
 ---
 
----
-
 # 🧱 **2. System Architecture Overview**
 
 ```mermaid
 flowchart TD
 
-A[User Query Request] --> B[FastAPI /search Endpoint]
+A(User Query Request) --> B(FastAPI /search Endpoint)
 
-B --> C[Google Shopping API Request - Async]
-C -->|200 OK| D[Shopping Results Received]
+B --> C(Google Shopping API Request - Async)
+C -->|200 OK| D(Shopping Results Received)
 
-D --> E[Store to MongoDB - raw_products]
+D --> E(Store to MongoDB - raw_products)
 
-E --> F[Extract Immersive Links]
+E --> F(Extract Immersive Links)
 
-F --> G[Parallel Immersive Fetch (async+retry)]
-G --> H[Strict Immersive Filter]
+F --> G(Parallel Immersive Fetch: async + retry)
+G --> H(Strict Immersive Filter)
 
-H --> I[Cleaned Product List]
+H --> I(Cleaned Product List)
 
-I --> J[Store to MongoDB - clean_products]
+I --> J(Store to MongoDB - clean_products)
 
-J --> K[Return Cleaned Response to Frontend]
+J --> K(Return Cleaned Response to Frontend)
 ```
 
 ---
