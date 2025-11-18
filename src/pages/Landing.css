@@ -1,0 +1,217 @@
+/* FONT IMPORT */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@400;700;900&display=swap');
+
+:root{
+  --bg: #0f1115;
+  --pill-green-bg: #e7fbee;
+  --pill-green-text: #11563c;
+  --pill-purple-bg: #eee9ff;
+  --pill-purple-text: #5a48c7;
+  --btn-top: #393d45;
+  --btn-bottom: #1d2025;
+}
+
+/* MAIN WRAPPER */
+.landing-wrapper {
+  width: 100%;
+  height: 100vh;                  /* viewport height (1536x864 target) */
+  background: var(--bg);
+  overflow: hidden;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* BACKGROUND FLOATING LAYER (behind hero) */
+.float-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 1;            /* behind the hero-content */
+  pointer-events: none;  /* hero remains interactive */
+}
+
+/* ---------- BIG CARDS (base) ---------- */
+.big-card {
+  width: 238px;   /* exact like screenshot */
+  height: 160px;  /* exact like screenshot */
+  background: linear-gradient(180deg, #1b1e23, #18191c);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.55);
+  position: absolute;
+  overflow: hidden;
+  animation-name: floatY;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+
+/* ---------- SMALL SQUARES (base) ---------- */
+.sq {
+  width: 62px;
+  height: 62px;
+  border-radius: 16px;
+  background: #26292e;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.36);
+  position: absolute;
+  opacity: 0.96;
+  animation-name: floatY;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* -----------------------
+   LEFT CLUSTER (pixel-perfect positions)
+   Target: 1536x864 screenshot
+   2 big cards + 7 small squares
+   ----------------------- */
+
+/* LEFT BIG CARDS */
+.left-big-1 {
+  top: 128px;
+  left: 130px;
+  animation-duration: 6.0s;
+  animation-delay: 0.28s;
+}
+.left-big-2 {
+  top: 520px;
+  left: 110px;
+  animation-duration: 6.6s;
+  animation-delay: 0.9s;
+}
+
+
+/* LEFT SMALL SQUARES */
+.left-sq-1 { top: 88px;  left: 34px;  animation-duration: 5.2s; animation-delay: 0.14s; }
+.left-sq-2 { top: 210px; left: 96px;  animation-duration: 6.4s; animation-delay: 0.82s; }
+.left-sq-3 { top: 300px; left: 220px; animation-duration: 5.7s; animation-delay: 0.45s; width:78px; height:78px; border-radius:18px; }
+.left-sq-4 { top: 420px; left: 120px; animation-duration: 7.0s; animation-delay: 1.1s; }
+.left-sq-5 { top: 554px; left: 210px; animation-duration: 5.9s; animation-delay: 0.62s; }
+.left-sq-6 { top: 620px; left: 84px;  animation-duration: 7.2s; animation-delay: 1.35s; }
+.left-sq-7 { top: 320px; left: 44px;  animation-duration: 6.1s; animation-delay: 0.5s; }
+
+/* -----------------------
+   RIGHT CLUSTER (pixel-perfect positions)
+   2 big cards + 8 small squares
+   ----------------------- */
+
+.right-big-1 {
+  top: 110px;
+  right: 120px;
+  animation-duration: 6.1s;
+  animation-delay: 0.48s;
+}
+.right-big-2 {
+  top: 500px;
+  right: 110px;
+  animation-duration: 6.8s;
+  animation-delay: 1.18s;
+}
+
+/* RIGHT SMALL SQUARES */
+.right-sq-1 { top: 72px;  right: 36px;  animation-duration: 5.6s; animation-delay: 0.18s; }
+.right-sq-2 { top: 230px; right: 210px; animation-duration: 6.5s; animation-delay: 1.02s; width:78px; height:78px; border-radius:18px; }
+.right-sq-3 { top: 320px; right: 130px; animation-duration: 5.8s; animation-delay: 0.42s; }
+.right-sq-4 { top: 410px; right: 250px; animation-duration: 7.0s; animation-delay: 1.25s; }
+.right-sq-5 { top: 488px; right: 150px; animation-duration: 6.0s; animation-delay: 0.76s; }
+.right-sq-6 { top: 620px; right: 240px; animation-duration: 7.3s; animation-delay: 1.6s; }
+.right-sq-7 { top: 140px; right: 300px; animation-duration: 5.1s; animation-delay: 0.05s; width:48px; height:48px; border-radius:12px; }
+.right-sq-8 { top: 350px; right: 330px; animation-duration: 6.2s; animation-delay: 1.12s; }
+
+/* slight color/tone variation to mimic screenshot */
+.left-sq-1{
+background-color: #3c2c3b;
+} 
+.left-sq-4{
+background-color: #3d2e2c;
+}
+.right-sq-3 { background: #10243d; }
+.right-sq-7 { background: #e9eef3; box-shadow: 0 8px 18px rgba(0,0,0,0.25); }
+
+/* ---------- FLOAT ANIMATION KEYFRAME ---------- */
+@keyframes floatY {
+  0%   { transform: translateY(0px) }
+  50%  { transform: translateY(-12px) }
+  100% { transform: translateY(0px) }
+}
+
+/* ---------- HERO (foreground) ---------- */
+.hero-content {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+  padding-top: 240px;         /* tuned to place title visually like screenshot */
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  /* uniform 15% reduction you asked for */
+  transform: scale(0.80);
+  transform-origin: top center;
+}
+
+/* Pills row */
+.hero-pills {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.pill {
+  padding: 6px 20px;
+  border-radius: 999px;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.pill-green { background: var(--pill-green-bg); color: var(--pill-green-text); }
+.pill-purple { background: var(--pill-purple-bg); color: var(--pill-purple-text); }
+
+/* Title (big serif) */
+.hero-title {
+  font-family: "Playfair Display", serif;
+  font-size: 138px;
+  line-height: 0.92;
+  color: #ffffff;
+  margin: 36px 0 0;
+  letter-spacing: -1.8px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtitle */
+.hero-subtitle {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  font-size: 17px;
+  max-width: 720px;
+  margin: 28px auto 0;
+  color: #cfd3d9;
+  line-height: 1.6;
+}
+
+/* CTA button */
+.hero-btn {
+  margin-top: 48px;
+  width: 225px;
+  height: 64px;
+  border-radius: 999px;
+  background: #2f323d;
+  color: white;
+  border: none;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.hero-btn:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
+
+/* Responsive: hide background floats on narrow screens to keep readability */
+@media (max-width: 1100px) {
+  .float-wrapper { display:none; }
+  .hero-content { transform: none; padding-top: 120px; }
+  .hero-title { font-size: 86px; line-height: 1.0; }
+  .hero-subtitle { max-width: 560px; font-size: 15px; }
+  .hero-btn { width: 200px; height: 56px; font-size: 16px; }
+}

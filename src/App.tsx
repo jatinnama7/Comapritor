@@ -11,6 +11,7 @@ import Loading from './pages/loading';
 import Product from './pages/Product';
 import Compared from './pages/Compared';
 import Productlist from './pages/Productlist';
+import Landingpage from './pages/landingpage';
 
 
 function App() {
@@ -27,7 +28,7 @@ function App() {
       <Route path="/product"element={<Product/>}/>
       <Route path="/compared"element={<Compared/>}/>
       <Route path="/list"element={<Productlist/>}/>
-
+      <Route path="/landingpage" element={<Landingpage />} />
 
     </Routes>
   );

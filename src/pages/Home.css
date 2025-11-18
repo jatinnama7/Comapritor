@@ -101,7 +101,7 @@ section {
   bottom: 45px;
   left: 50%;
   transform: translateX(-50%);
-  background: #F9F5F6;
+  background: #373a47;
   width: 35%;
   max-width: 600px;
   height: auto;
@@ -113,6 +113,9 @@ section {
   z-index: 10;
   
 }
+.floating-search-bar input::placeholder {
+  color: #b3b9cd; /* Change to your desired color */
+}
 
 .floating-search-bar input {
   flex: 1;
@@ -120,7 +123,7 @@ section {
   outline: none;
   font-size: 1rem;
   background: transparent;
-  color: #202124;
+  color: #fff;
   font-family: Arial, sans-serif;
 }
 
