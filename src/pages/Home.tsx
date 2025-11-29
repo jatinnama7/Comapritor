@@ -685,9 +685,6 @@ const Home = () => {
         <Page2 />
       </section>
 
-      <section className="contacts-section">
-        <Contacts />
-      </section>
 
     </div>
   );
