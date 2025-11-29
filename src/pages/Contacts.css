@@ -1,4 +1,4 @@
-/* Wrapper for full screen Spline */
+Wrapper for full screen Spline
 .spline-wrapper {
   width: 100vw;
   height: 100vh;
@@ -6,11 +6,10 @@
   overflow: hidden;
 }
 .static-spline {
-  pointer-events: none !important;   /* disables zoom, rotate, drag */
+  pointer-events: none !important;   
 }
 
 
-/* 🎉 Animated Speech Bubble */
 .speech-bubble {
   position: absolute;
   top: 190px;
@@ -27,7 +26,6 @@
   animation: bubblePop 0.45s ease-out forwards;
   opacity: 0;
 
-  /* Add the bubble tail */
 }
 
 .speech-bubble::after {
@@ -39,13 +37,11 @@
   width: 0;
   height: 0;
 
-  /* Triangle tail */
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
   border-top: 12px solid white;
 }
 
-/* 🎬 POP-IN ANIMATION */
 @keyframes bubblePop {
   0% {
     opacity: 0;

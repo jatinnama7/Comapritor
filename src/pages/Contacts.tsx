@@ -13,6 +13,7 @@ function Contacts() {
     >
       <Spline className="static-spline"  scene="https://prod.spline.design/hTBnxFWE73d5rKcG/scene.splinecode" />
 
+
       {/* 🎨 Animated Speech Bubble */}
       {showMessage && (
         <div className="speech-bubble">
