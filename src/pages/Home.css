@@ -7,10 +7,19 @@ html, body, #root {
   
 }
 
+
 /* Scroll Container */
-.scroll-container {
+/* .scroll-container {
   height: 100vh;
   overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+} */
+.scroll-container {
+  width: 100vw;
+  height: 100vh;
+  overflow-y: scroll;
+  overflow-x: hidden;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
 }
@@ -440,3 +449,4 @@ section {
     opacity: 1;
   }
 } */
+

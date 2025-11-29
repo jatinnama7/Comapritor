@@ -499,6 +499,10 @@ import book from '../assets/book.png';
 import watch from '../assets/watch.png';
 
 import { AnimatedText } from "../Components/AnimatedText";
+import './Landing.css';
+import './Explorepage';
+import Contacts from "./Contacts";
+
 
 const Home = () => {
   const [query, setQuery] = useState("");
@@ -521,42 +525,45 @@ const Home = () => {
   ];
 
   // ✅ Backend integration for search
-  async function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && query.trim()) {
-      setFadeOut(true);
+  // async function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  //   if (e.key === "Enter" && query.trim()) {
+  //     setFadeOut(true);
 
-      try {
-        const response = await fetch("http://127.0.0.1:8000/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: query.trim(),
-            language: "en",
-            country: "in",
-          }),
-        });
+  //     try {
+  //       const response = await fetch("http://127.0.0.1:8000/search", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({
+  //           query: query.trim(),
+  //           language: "en",
+  //           country: "in",
+  //         }),
+  //       });
 
-        if (!response.ok) throw new Error("Backend request failed");
+  //       if (!response.ok) throw new Error("Backend request failed");
 
-        const data = await response.json();
-        console.log("✅ Products fetched:", data.cleaned_products);
+  //       const data = await response.json();
+  //       console.log("✅ Products fetched:", data.cleaned_products);
 
-        // Save to localStorage for your Cards page
-        localStorage.setItem("searchResults", JSON.stringify(data.cleaned_products || []));
+  //       // Save to localStorage for your Cards page
+  //       localStorage.setItem("searchResults", JSON.stringify(data.cleaned_products || []));
 
-        // Redirect to results/loading page
-        setTimeout(() => {
-          navigate(`/loading?query=${encodeURIComponent(query.trim())}`);
-        }, 800);
+  //       // Redirect to results/loading page
+  //       setTimeout(() => {
+  //         navigate(`/loading?query=${encodeURIComponent(query.trim())}`);
+  //       }, 800);
 
-      } catch (error) {
-        console.error("❌ Error fetching search data:", error);
-      }
-    }
-  }
+  //     } catch (error) {
+  //       console.error("❌ Error fetching search data:", error);
+  //     }
+  //   }
+  // }
+
 
   return (
     <div className={`scroll-container ${fadeOut ? "fade-out" : "fade-in"}`}>
+    
+
       {!isLoggedIn && (
         <Joyride
           steps={steps}
@@ -573,7 +580,7 @@ const Home = () => {
 
       <section className="home-hero-section">
         <Navbar />
-        <div className="home-hero">
+        {/* <div className="home-hero">
           <div>
             <AnimatedText
               className="home-hero"
@@ -591,7 +598,63 @@ const Home = () => {
               <p>Compare products from Amazon, Flipkart, and Meesho in one click with our smart AI-powered tool.</p>
             </div>
           </div>
+        </div> */}
+    <div className="landing-wrapper">
+
+      {/* BACKGROUND FLOATING LAYER (behind hero) */}
+      <div className="float-wrapper" aria-hidden>
+
+        {/* LEFT CLUSTER (9 divs: 2 big + 7 small) */}
+        <div className="big-card left-big-1 card-filled">  </div>
+        <div className="big-card left-big-2"></div>
+
+        <div className="sq left-sq-1"></div>
+        <div className="sq left-sq-2"></div>
+        <div className="sq left-sq-3"></div>
+        <div className="sq left-sq-4"></div>
+        <div className="sq left-sq-5"></div>
+        <div className="sq left-sq-6"></div>
+        <div className="sq left-sq-7"></div>
+
+        {/* RIGHT CLUSTER (10 divs: 2 big + 8 small) */}
+        <div className="big-card right-big-1">        </div>
+        <div className="big-card right-big-2"></div>
+
+        <div className="sq right-sq-1"></div>
+        <div className="sq right-sq-2"></div>
+        <div className="sq right-sq-3"></div>
+        <div className="sq right-sq-4"></div>
+        <div className="sq right-sq-5"></div>
+        <div className="sq right-sq-6"></div>
+        <div className="sq right-sq-7"></div>
+        <div className="sq right-sq-8"></div>
+
+      </div>
+
+      {/* FOREGROUND HERO (centered, above floats) */}
+      <main className="hero-content" role="main" aria-label="Hero section">
+        <div className="hero-pills">
+          <span className="pill pill-green">Fresh updates weekly</span>
+          <span className="pill pill-purple">Flows now available for everyone</span>
         </div>
+
+        <h1 className="hero-title">
+              Compare Smarter<br />Shop Better
+        </h1>
+
+        <p className="hero-subtitle">
+          Compare products from Amazon, Flipkart, and Meesho in one click with our smart AI-powered tool.
+        </p>
+
+<button 
+  className="hero-btn"
+  onClick={() => navigate("./explore")}
+>
+  Start Exploring
+</button>
+      </main>
+    </div>
+  
 
         <img src={game} alt="Promotional" className="promo-image" />
         <img src={headphone} alt="Promotional1" className="promo-image2" />
@@ -602,7 +665,7 @@ const Home = () => {
         <img src={watch} alt="Promotional7" className="promo-image8" />
 
         {/* 🔍 Floating Search Bar */}
-        <div className="floating-search-bar">
+        {/* <div className="floating-search-bar">
           <input
             type="text"
             placeholder="Search for a product..."
@@ -611,7 +674,7 @@ const Home = () => {
             onKeyDown={onKeyDown}
           />
           <span className="search-icons"></span>
-        </div>
+        </div> */}
       </section>
 
       <section className="page1-section">
@@ -621,6 +684,11 @@ const Home = () => {
       <section className="page2-section">
         <Page2 />
       </section>
+
+      <section className="contacts-section">
+        <Contacts />
+      </section>
+
     </div>
   );
 };

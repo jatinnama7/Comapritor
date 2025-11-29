@@ -1,10 +1,10 @@
 import React from "react";
 import "./Landing.css";
-
+// import { Cursor } from "../Components/inverted-cursor";
 const Landingpage = () => {
   return (
     <div className="landing-wrapper">
-
+     {/* <Cursor size={60} />  */}
       {/* BACKGROUND FLOATING LAYER (behind hero) */}
       <div className="float-wrapper" aria-hidden>
 

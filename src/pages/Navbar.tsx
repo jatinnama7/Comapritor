@@ -78,8 +78,8 @@ const Navbar = () => {
         </div>
 
         <div className="navbar-left">
-        <Link to="/landingpage" className="nav-link">Home</Link>
-          <a href="#" className="nav-link">Help Center</a>
+        <Link to="#" className="nav-link">Home</Link>
+          <a href="/contacts" className="nav-link">Contacts</a>
           <a href="#" className="nav-link">Pricing</a>
         </div>
 

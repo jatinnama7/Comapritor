@@ -1,5 +1,6 @@
 .html, body {
   overflow-x: hidden;
+  width: 150px
 }
  .page1-container {
   height: 100vh;

@@ -1,0 +1,62 @@
+/* Wrapper for full screen Spline */
+.spline-wrapper {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+.static-spline {
+  pointer-events: none !important;   /* disables zoom, rotate, drag */
+}
+
+
+/* 🎉 Animated Speech Bubble */
+.speech-bubble {
+  position: absolute;
+  top: 190px;
+  left: 755px;
+
+  background: #ffffff;
+  color: #000;
+  padding: 14px 20px;
+  border-radius: 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  box-shadow: 0px 8px 25px rgba(0,0,0,0.2);
+
+  animation: bubblePop 0.45s ease-out forwards;
+  opacity: 0;
+
+  /* Add the bubble tail */
+}
+
+.speech-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -12px;
+  left: 25px;
+
+  width: 0;
+  height: 0;
+
+  /* Triangle tail */
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 12px solid white;
+}
+
+/* 🎬 POP-IN ANIMATION */
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

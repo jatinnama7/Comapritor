@@ -1,6 +1,14 @@
 /* FONT IMPORT */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@400;700;900&display=swap');
 
+.html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
 :root{
   --bg: #0f1115;
   --pill-green-bg: #e7fbee;
@@ -14,7 +22,7 @@
 /* MAIN WRAPPER */
 .landing-wrapper {
   width: 100%;
-  height: 100vh;                  /* viewport height (1536x864 target) */
+  height: 100vh;                 
   background: var(--bg);
   overflow: hidden;
   position: relative;
@@ -66,18 +74,7 @@
    ----------------------- */
 
 /* LEFT BIG CARDS */
-.left-big-1 {
-  top: 128px;
-  left: 130px;
-  animation-duration: 6.0s;
-  animation-delay: 0.28s;
-}
-.left-big-2 {
-  top: 520px;
-  left: 110px;
-  animation-duration: 6.6s;
-  animation-delay: 0.9s;
-}
+
 
 
 /* LEFT SMALL SQUARES */
@@ -117,13 +114,76 @@
 .right-sq-7 { top: 140px; right: 300px; animation-duration: 5.1s; animation-delay: 0.05s; width:48px; height:48px; border-radius:12px; }
 .right-sq-8 { top: 350px; right: 330px; animation-duration: 6.2s; animation-delay: 1.12s; }
 
+.left-big-1 {
+  top: 128px;
+  left: 136px;
+  animation-duration: 6.0s;
+  animation-delay: 0.28s;
+}
+.left-big-2 {
+  top: 540px;
+  left: 20px;
+  animation-duration: 6.6s;
+  animation-delay: 0.9s;
+}
+
+
 /* slight color/tone variation to mimic screenshot */
 .left-sq-1{
 background-color: #3c2c3b;
+width: 95px;
+height: 95px;
+left: 25px;
+margin-top: 20px;
 } 
-.left-sq-4{
-background-color: #3d2e2c;
+.left-sq-2{
+  background-color: #10243d;
+  left: 38px;
+  margin-top: 20px;
+  width: 64px;
+  height: 64px;
 }
+.left-sq-3{
+  background-color: #11563c;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  left: 220px;
+  margin-top: 20px;
+}
+.left-sq-4{
+background-color: #d27669;
+margin-top: -59px;
+left: 126px;
+}
+
+.left-sq-5{
+  background-color: #718cc4;
+  margin-left: 120px;
+  margin-top: -49px;
+  width: 64px;
+  height: 64px;
+  
+}
+
+.left-sq-6{
+  background-color: #e9eef3;
+  width: 49px;
+  height: 49px;
+  border-radius: 12px;
+  left: 238px;
+  margin-top: -180px;
+  
+}
+
+.left-sq-7{
+  background-color: #5a48c7;
+  margin-top: 108px;
+  left: 33px;
+  width: 64px;
+  height: 64px;
+}
+
 .right-sq-3 { background: #10243d; }
 .right-sq-7 { background: #e9eef3; box-shadow: 0 8px 18px rgba(0,0,0,0.25); }
 
@@ -152,17 +212,17 @@ background-color: #3d2e2c;
 /* Pills row */
 .hero-pills {
   display: flex;
-  gap: 18px;
+  gap: 28px;
   justify-content: center;
   pointer-events: auto;
 }
 
 .pill {
-  padding: 6px 20px;
+  padding: 10px 30px;
   border-radius: 999px;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .pill-green { background: var(--pill-green-bg); color: var(--pill-green-text); }
@@ -171,7 +231,7 @@ background-color: #3d2e2c;
 /* Title (big serif) */
 .hero-title {
   font-family: "Playfair Display", serif;
-  font-size: 138px;
+  font-size: 128px;
   line-height: 0.92;
   color: #ffffff;
   margin: 36px 0 0;
@@ -215,3 +275,5 @@ background-color: #3d2e2c;
   .hero-subtitle { max-width: 560px; font-size: 15px; }
   .hero-btn { width: 200px; height: 56px; font-size: 16px; }
 }
+
+
