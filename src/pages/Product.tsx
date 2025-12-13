@@ -330,6 +330,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { AnimatedBeam } from "../Components/animated-beam";
 import FuturisticProductCard from "@/Components/FuturisticProductCard";
+import { useNavigate } from "react-router-dom";
+
 
 const Product: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -352,7 +354,7 @@ useEffect(() => {
   setLoading(false); // ✅ Stop shimmer once data is loaded
 }, []);
 
-
+  const navigate = useNavigate();
   const [fadeIn, setFadeIn] = useState(false);
   const [beamReady, setBeamReady] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -690,7 +692,24 @@ useEffect(() => {
     No products found.
   </div>
 )}
-
+<button
+  onClick={() => navigate("/dashboard")}
+  style={{
+    position: "fixed",
+    bottom: "24px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    padding: "10px 24px",
+    borderRadius: "6px",
+    backgroundColor: "#ffffff",
+    color: "#000",
+    border: "1px solid #ccc",
+    cursor: "pointer",
+    zIndex: 50,
+  }}
+>
+  Go to Dashboard
+</button>
   </div>
 </motion.div>
 

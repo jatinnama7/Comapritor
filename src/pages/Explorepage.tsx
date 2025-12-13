@@ -15,7 +15,6 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./Explore.css";
 
 function Explorepage() {
   const [query, setQuery] = useState("");
@@ -60,13 +59,9 @@ function Explorepage() {
   return (
     <div className={`explore-container ${fadeOut ? "fade-out" : "fade-in"}`}>
 
-      <h1 className="explore-title">Explore Products</h1>
-      <p className="explore-subtext">
-        Discover the best deals curated by our AI.
-      </p>
 
       {/* 🔍 SEARCH BLOCK (taken from Home page) */}
-      <div className="explore-search-bar">
+      <div className="floating-search-bar">
         <input
           type="text"
           placeholder="Search for a product..."
@@ -76,6 +71,7 @@ function Explorepage() {
         />
         <span className="search-icons"></span>
       </div>
+
 
     </div>
   );

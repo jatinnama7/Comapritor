@@ -1,8 +1,7 @@
-/* === EXPLORE PAGE BASE LAYOUT === */
 .explore-container {
   width: 100vw;
   height: 100vh;
-  background: #0f1115;            /* Dark theme like your home page */
+  background: #0f1115;            
   color: #ffffff;
   display: flex;
   flex-direction: column;
@@ -16,24 +15,9 @@
   box-sizing: border-box;
 }
 
-/* === MAIN TITLE === */
-.explore-title {
-  font-size: 3.5rem;
-  font-weight: 700;
-  background: linear-gradient(90deg, #a78bfa, #6366f1, #818cf8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 
-  margin-bottom: 15px;
-}
 
-/* === SUB TEXT === */
-.explore-subtext {
-  font-size: 1.3rem;
-  color: #cbd5e1;
-  max-width: 600px;
-  margin-bottom: 20px;
-}
+
 
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
@@ -83,6 +67,7 @@
   border-radius: 28px;
   display: flex;
   align-items: center;
+  margin-top: -620px;
 }
 
 .explore-search-bar input {
@@ -115,3 +100,5 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
+
+

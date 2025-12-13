@@ -57,6 +57,7 @@ import { useState } from "react";
 import introVideo from "../assets/intro.mp4"; // adjust path if needed
 import { Home, User, Briefcase, FileText } from 'lucide-react'
 import { NavBar } from "@/Components/ui/tubelight-navbar"
+import Reels from "./Reels";
 
 const Navbar = () => {
   const [showVideo, setShowVideo] = useState(false);
@@ -80,7 +81,7 @@ const Navbar = () => {
         <div className="navbar-left">
         <Link to="#" className="nav-link">Home</Link>
           <a href="/contacts" className="nav-link">Contacts</a>
-          <a href="#" className="nav-link">Pricing</a>
+          <a href="/reels" className="nav-link">Reels</a>
         </div>
 
         <div className="navbar-right">

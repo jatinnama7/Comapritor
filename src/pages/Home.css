@@ -107,7 +107,7 @@ section {
 /* Search Bar */
 .floating-search-bar {
   position: fixed;
-  bottom: 45px;
+  bottom: 650px;
   left: 50%;
   transform: translateX(-50%);
   background: #373a47;

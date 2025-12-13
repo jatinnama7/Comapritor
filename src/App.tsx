@@ -13,6 +13,8 @@ import Compared from './pages/Compared';
 import Productlist from './pages/Productlist';
 import Explorepage from './pages/Explorepage';
 import Contacts from './pages/Contacts';
+import Reels from './pages/Reels';
+import Dashboard from './pages/Dashboard';
 
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
       <Route path="/list"element={<Productlist/>}/>
       <Route path="/explore"element={<Explorepage/>}/>
       <Route path="/contacts"element={<Contacts/>}/>
+      <Route path="/reels"element={<Reels/>}/>
+      <Route path="/dashboard" element={<Dashboard/>}/>
 
     </Routes>
   );
