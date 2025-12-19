@@ -640,6 +640,26 @@ useEffect(() => {
       
     }}
   >
+    <button
+  onClick={() => navigate("/threeD")}
+  style={{
+    position: "fixed",
+    right: "24px",
+    top: "5%",
+    transform: "translateY(-50%)",
+    padding: "14px 18px",
+    borderRadius: "10px",
+    background: "linear-gradient(135deg, #06b6d4, #9333ea)",
+    color: "#fff",
+    fontWeight: 600,
+    border: "none",
+    cursor: "pointer",
+    zIndex: 100,
+    boxShadow: "0 0 20px rgba(147,51,234,0.5)",
+  }}
+>
+  3D Product View
+</button>
     {loading ? (
   // Placeholder shimmer while loading
   Array.from({ length: 8 }).map((_, index) => (

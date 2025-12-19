@@ -15,6 +15,7 @@ import Explorepage from './pages/Explorepage';
 import Contacts from './pages/Contacts';
 import Reels from './pages/Reels';
 import Dashboard from './pages/Dashboard';
+import ThreeD from './pages/ThreeD';
 
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
       <Route path="/contacts"element={<Contacts/>}/>
       <Route path="/reels"element={<Reels/>}/>
       <Route path="/dashboard" element={<Dashboard/>}/>
+      <Route path="/threeD" element={<ThreeD/>}/>
 
     </Routes>
   );
