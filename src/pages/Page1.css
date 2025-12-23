@@ -1,5 +1,6 @@
 .html, body {
   overflow-x: hidden;
+  width: 150px
 }
  .page1-container {
   height: 100vh;
@@ -7,12 +8,12 @@
   flex-direction: column;
   justify-content: flex-start;  /* align items to the top */
   align-items: flex-start;      /* align items to the left */
-  background-color: #5459AC; 
+  background-color: #13151a; 
   color: #ffffff;
   font-family: 'Segoe UI', sans-serif;
   padding: 100px 120px;
   text-align: left;      
-  width: 1545px;       /* ensure left alignment */
+  width: 1547px;       /* ensure left alignment */
 
 }
 

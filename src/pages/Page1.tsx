@@ -2,12 +2,13 @@ import React from 'react';
 import './Page1.css';
 import Navbar from './Navbar';
 import ai from '../assets/ai.png';
+// import { Cursor } from '@/Components/inverted-cursor';
+
 
 
 const Page1 = () => {
   return (
     <>
-    
       <Navbar />
       
       <div className="page1-container">

@@ -51,11 +51,13 @@ import { FaGlobe } from "react-icons/fa";
 import "tailwindcss";
 import Button from "./Button";
 import "./Navbar.css";
+import { Link } from "react-router-dom";
 import { SparklesText } from "../Components/sparkles-text";
 import { useState } from "react";
 import introVideo from "../assets/intro.mp4"; // adjust path if needed
 import { Home, User, Briefcase, FileText } from 'lucide-react'
 import { NavBar } from "@/Components/ui/tubelight-navbar"
+import Reels from "./Reels";
 
 const Navbar = () => {
   const [showVideo, setShowVideo] = useState(false);
@@ -77,9 +79,9 @@ const Navbar = () => {
         </div>
 
         <div className="navbar-left">
-          <a href="#" className="nav-link">Best Practices</a>
-          <a href="#" className="nav-link">Help Center</a>
-          <a href="#" className="nav-link">Pricing</a>
+        <Link to="#" className="nav-link">Home</Link>
+          <a href="/contacts" className="nav-link">Contacts</a>
+          <a href="/reels" className="nav-link">Reels</a>
         </div>
 
         <div className="navbar-right">

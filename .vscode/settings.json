@@ -1,0 +1,9 @@
+{
+    "cSpell.words": [
+        "Hyperspeed"
+    ],
+    "postman.settings.dotenv-detection-notification-visibility": false,
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": [],
+    "python-envs.defaultPackageManager": "ms-python.python:pip"
+}

@@ -11,6 +11,11 @@ import Loading from './pages/loading';
 import Product from './pages/Product';
 import Compared from './pages/Compared';
 import Productlist from './pages/Productlist';
+import Explorepage from './pages/Explorepage';
+import Contacts from './pages/Contacts';
+import Reels from './pages/Reels';
+import Dashboard from './pages/Dashboard';
+import ThreeD from './pages/ThreeD';
 
 
 function App() {
@@ -27,7 +32,11 @@ function App() {
       <Route path="/product"element={<Product/>}/>
       <Route path="/compared"element={<Compared/>}/>
       <Route path="/list"element={<Productlist/>}/>
-
+      <Route path="/explore"element={<Explorepage/>}/>
+      <Route path="/contacts"element={<Contacts/>}/>
+      <Route path="/reels"element={<Reels/>}/>
+      <Route path="/dashboard" element={<Dashboard/>}/>
+      <Route path="/threeD" element={<ThreeD/>}/>
 
     </Routes>
   );
