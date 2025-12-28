@@ -1,7 +1,14 @@
 .env
+/Scraper/.env
 /Scraper/Trials/
 /Scraper/scrape_env
 /Scraper/__pycache__/
+/Scraper/search_*.json
+*.pyc
+__pycache__/
+/.venv/
+/Scraper/.venv/
+/.pytest_cache/
 node_modules/
 
 # Logs

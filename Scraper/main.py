@@ -1,938 +1,232 @@
-# import asyncio
-# import httpx
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-# from typing import Optional
-# from pymongo import MongoClient
-# from dotenv import load_dotenv
-# import os
-# import datetime
-
-# # load_dotenv()
-# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-
-# # ============================
-# # API KEY ROTATION SETUP
-# # ============================
-# API_KEYS = os.getenv("SCRAPINGDOG_API_KEYS").split(",")
-# current_index = 0
-
-# def get_key():
-#     global current_index
-#     return API_KEYS[current_index].strip()
-
-# def rotate_key():
-#     global current_index
-#     current_index = (current_index + 1) % len(API_KEYS)
-#     print(f"🔄 API key rotated → index {current_index}")
-
-
-# # ============================
-# # MONGODB SETUP
-# # ============================
-# client = MongoClient(os.getenv("MONGODB_URI"))
-# db = client["shopping_data"]
-
-# def init_collections(db):
-#     required_collections = {
-#         "raw_products": [
-#             ("query", 1),
-#             ("timestamp", -1),
-#         ],
-#         "clean_products": [
-#             ("query", 1),
-#             ("timestamp", -1),
-#         ]
-#     }
-
-#     existing = db.list_collection_names()
-
-#     for col, indexes in required_collections.items():
-#         if col not in existing:
-#             print(f"✅ Creating collection: {col}")
-#             db.create_collection(col)
-
-#         for field, order in indexes:
-#             db[col].create_index([(field, order)])
-#             print(f"   → Index created on '{field}' ({order}) for {col}")
-
-# init_collections(db)
-
-# raw_collection = db["raw_products"]
-# clean_collection = db["clean_products"]
-
-# # ============================
-# # FastAPI app
-# # ============================
-# app = FastAPI()
-
-
-# class SearchRequest(BaseModel):
-#     query: str
-#     language: Optional[str] = "en"
-#     country: Optional[str] = "in"
-
-
-# # ============================
-# # Async immersive fetch (with retry & light pacing)
-# # ============================
-# async def fetch_immersive_async(client, link: str, retries: int = 2):
-#     if not link:
-#         return None
-
-#     for attempt in range(retries):
-#         try:
-#             r = await client.get(link, timeout=10)
-#             if r.status_code == 200:
-#                 return r.json()
-
-#             # if rate limited → brief wait & retry
-#             if r.status_code in [403, 429]:
-#                 await asyncio.sleep(0.25)
-#                 continue
-
-#         except Exception as e:
-#             print("❌ Immersive fetch error:", e)
-
-#         # small jitter between attempts
-#         await asyncio.sleep(0.1)
-
-#     return None
-
-
-# # ============================
-# # Clean immersive data → STRICT (no outer fallbacks)
-# # ============================
-# def extract_clean_immersive(raw_immersive):
-#     """
-#     Returns a dict with strictly immersive-derived fields or None if required fields are missing.
-#     Required: brand, thumbnails[0], stores[0].link
-#     Optional: rating, reviews (if immersive includes them)
-#     """
-#     if not raw_immersive:
-#         return None
-
-#     brand = raw_immersive.get("brand")
-#     thumbs = raw_immersive.get("thumbnails", [])
-#     stores = raw_immersive.get("stores", [])
-
-#     # enforce required keys from immersive
-#     if not brand or not thumbs or not isinstance(thumbs, list) or not thumbs[0]:
-#         return None
-#     if not stores or not isinstance(stores, list) or not stores[0].get("link"):
-#         return None
-
-#     return {
-#         "brand": brand,
-#         "thumbnail": thumbs[0],
-#         "link": stores[0]["link"],
-#         # Optional: pass through immersive rating/reviews if you ever want them from immersive
-#         # "rating_immersive": raw_immersive.get("rating"),
-#         # "reviews_immersive": raw_immersive.get("reviews"),
-#     }
-
-
-# # ============================
-# # MAIN SEARCH ENDPOINT (ASYNC)
-# # ============================
-# @app.post("/search")
-# async def search_and_store(request: SearchRequest):
-
-#     global current_index
-
-#     base_url = "https://api.scrapingdog.com/google_shopping"
-
-#     attempts = 0
-#     max_attempts = len(API_KEYS)
-
-#     async with httpx.AsyncClient() as client_http:
-
-#         # =====================================
-#         # Fetch main shopping results (single call)
-#         # =====================================
-#         while attempts < max_attempts:
-
-#             params = {
-#                 "api_key": get_key(),
-#                 "query": request.query,
-#                 "language": request.language,
-#                 "country": request.country
-#             }
-
-#             response = await client_http.get(base_url, params=params)
-
-#             if response.status_code == 200:
-#                 break
-
-#             if response.status_code in [403, 429]:
-#                 rotate_key()
-#                 attempts += 1
-#                 continue
-
-#             return {
-#                 "error": f"API Error: {response.status_code}",
-#                 "details": response.text
-#             }
-
-#         data = response.json()
-#         shopping_results = data.get("shopping_results", [])
-
-#         # ============================
-#         # Save RAW data
-#         # ============================
-#         raw_entry_id = raw_collection.insert_one({
-#             "query": request.query.lower(),
-#             "raw_results": data,
-#             "timestamp": datetime.datetime.utcnow()
-#         }).inserted_id
-
-#         # ============================
-#         # Async immersive fetch (parallel)
-#         # (optional) limit concurrency to avoid throttling
-#         # ============================
-#         immersive_links = [
-#             item.get("scrapingdog_immersive_product_link")
-#             for item in shopping_results
-#         ]
-
-#         # Simple parallel fetch; if you hit throttling often, we can batch with a semaphore
-#         tasks = [fetch_immersive_async(client_http, link) for link in immersive_links]
-#         immersive_results = await asyncio.gather(*tasks)
-
-#         # ============================
-#         # Clean + merge data (STRICT immersive only)
-#         # ============================
-#         cleaned_items = []
-
-#         for item, immersive_raw in zip(shopping_results, immersive_results):
-#             immersive_clean = extract_clean_immersive(immersive_raw)
-#             if not immersive_clean:
-#                 # Skip this product if immersive data is missing/invalid
-#                 continue
-
-#             # Outer-sourced fields: (title, source, reviews, rating, price) are still trusted per your spec.
-#             # Immersive-sourced fields: brand, thumbnail, link (strictly from immersive)
-#             cleaned_items.append({
-#                 "title": item.get("title"),
-#                 "source": item.get("source"),
-#                 "reviews": item.get("reviews"),
-#                 "rating": item.get("rating"),
-#                 "price": item.get("price"),
-#                 "brand": immersive_clean["brand"],
-#                 "thumbnail": immersive_clean["thumbnail"],
-#                 "link": immersive_clean["link"]
-#             })
-
-#         # ============================
-#         # Save cleaned data
-#         # ============================
-#         clean_collection.insert_one({
-#             "query": request.query.lower(),
-#             "cleaned_products": cleaned_items,
-#             "raw_reference_id": raw_entry_id,
-#             "timestamp": datetime.datetime.utcnow()
-#         })
-
-#         # ✅ Return results
-#         return {
-#             "message": "Scraped & stored successfully",
-#             "items_cleaned": len(cleaned_items),
-#             "cleaned_products": cleaned_items
-#         }
-# import asyncio
-# import httpx
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-# from typing import Optional
-# from pymongo import MongoClient
-# from dotenv import load_dotenv
-# import os
-# import datetime
-# import json
-
-# # ============================
-# # Load Environment Variables
-# # ============================
-# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-
-# api_keys_env = os.getenv("SCRAPINGDOG_API_KEYS")
-# if not api_keys_env:
-#     raise EnvironmentError("❌ SCRAPINGDOG_API_KEYS not found. Check your .env file path or content.")
-
-# API_KEYS = api_keys_env.split(",")
-# current_index = 0
-
-
-# def get_key():
-#     global current_index
-#     return API_KEYS[current_index].strip()
-
-
-# def rotate_key():
-#     global current_index
-#     current_index = (current_index + 1) % len(API_KEYS)
-#     print(f"🔄 API key rotated → index {current_index}")
-
-
-# # ============================
-# # MongoDB Setup
-# # ============================
-# client = MongoClient(os.getenv("MONGODB_URI"))
-# db = client["shopping_data"]
-
-
-# def init_collections(db):
-#     required_collections = {
-#         "raw_products": [
-#             ("query", 1),
-#             ("timestamp", -1),
-#         ],
-#         "clean_products": [
-#             ("query", 1),
-#             ("timestamp", -1),
-#         ]
-#     }
-
-#     existing = db.list_collection_names()
-
-#     for col, indexes in required_collections.items():
-#         if col not in existing:
-#             print(f"✅ Creating collection: {col}")
-#             db.create_collection(col)
-
-#         for field, order in indexes:
-#             db[col].create_index([(field, order)])
-#             print(f"   → Index created on '{field}' ({order}) for {col}")
-
-
-# init_collections(db)
-
-# raw_collection = db["raw_products"]
-# clean_collection = db["clean_products"]
-
-# # ============================
-# # FastAPI App
-# # ============================
-# app = FastAPI()
-
-
-# @app.get("/")
-# def home():
-#     return {"message": "🚀 Scraper API is running! Use /search to query products."}
-
-
-# class SearchRequest(BaseModel):
-#     query: str
-#     language: Optional[str] = "en"
-#     country: Optional[str] = "in"
-
-
-# # ============================
-# # Async immersive fetch (with retry & pacing)
-# # ============================
-# async def fetch_immersive_async(client, link: str, retries: int = 2):
-#     if not link:
-#         return None
-
-#     for attempt in range(retries):
-#         try:
-#             r = await client.get(link, timeout=10)
-#             if r.status_code == 200:
-#                 return r.json()
-
-#             # rate limit → retry
-#             if r.status_code in [403, 429]:
-#                 await asyncio.sleep(0.25)
-#                 continue
-
-#         except Exception as e:
-#             print("❌ Immersive fetch error:", e)
-
-#         await asyncio.sleep(0.1)
-
-#     return None
-
-
-# # ============================
-# # Clean immersive data
-# # ============================
-# def extract_clean_immersive(raw_immersive):
-#     if not raw_immersive:
-#         return None
-
-#     brand = raw_immersive.get("brand")
-#     thumbs = raw_immersive.get("thumbnails", [])
-#     stores = raw_immersive.get("stores", [])
-
-#     if not brand or not thumbs or not isinstance(thumbs, list) or not thumbs[0]:
-#         return None
-#     if not stores or not isinstance(stores, list) or not stores[0].get("link"):
-#         return None
-
-#     return {
-#         "brand": brand,
-#         "thumbnail": thumbs[0],
-#         "link": stores[0]["link"],
-#     }
-
-
-# # ============================
-# # MAIN SEARCH FUNCTION (Shared by API + Terminal)
-# # ============================
-# async def perform_search(query: str, language: str = "en", country: str = "in"):
-#     global current_index
-
-#     base_url = "https://api.scrapingdog.com/google_shopping"
-#     attempts = 0
-#     max_attempts = len(API_KEYS)
-
-#     async with httpx.AsyncClient() as client_http:
-#         # --- Fetch main search results ---
-#         while attempts < max_attempts:
-#             params = {
-#                 "api_key": get_key(),
-#                 "query": query,
-#                 "language": language,
-#                 "country": country,
-#             }
-
-#             response = await client_http.get(base_url, params=params)
-
-#             if response.status_code == 200:
-#                 break
-
-#             if response.status_code in [403, 429]:
-#                 rotate_key()
-#                 attempts += 1
-#                 continue
-
-#             return {"error": f"API Error: {response.status_code}", "details": response.text}
-
-#         data = response.json()
-#         shopping_results = data.get("shopping_results", [])
-
-#         # --- Save raw results ---
-#         raw_entry_id = raw_collection.insert_one({
-#             "query": query.lower(),
-#             "raw_results": data,
-#             "timestamp": datetime.datetime.utcnow()
-#         }).inserted_id
-
-#         # --- Fetch immersive details ---
-#         immersive_links = [item.get("scrapingdog_immersive_product_link") for item in shopping_results]
-#         tasks = [fetch_immersive_async(client_http, link) for link in immersive_links]
-#         immersive_results = await asyncio.gather(*tasks)
-
-#         # --- Clean and merge ---
-#         cleaned_items = []
-#         for item, immersive_raw in zip(shopping_results, immersive_results):
-#             immersive_clean = extract_clean_immersive(immersive_raw)
-#             if not immersive_clean:
-#                 continue
-
-#             cleaned_items.append({
-#                 "title": item.get("title"),
-#                 "source": item.get("source"),
-#                 "reviews": item.get("reviews"),
-#                 "rating": item.get("rating"),
-#                 "price": item.get("price"),
-#                 "brand": immersive_clean["brand"],
-#                 "thumbnail": immersive_clean["thumbnail"],
-#                 "link": immersive_clean["link"]
-#             })
-
-#         # --- Save cleaned results ---
-#         clean_collection.insert_one({
-#             "query": query.lower(),
-#             "cleaned_products": cleaned_items,
-#             "raw_reference_id": raw_entry_id,
-#             "timestamp": datetime.datetime.utcnow()
-#         })
-
-#         return {
-#             "message": "Scraped & stored successfully",
-#             "items_cleaned": len(cleaned_items),
-#             "cleaned_products": cleaned_items,
-#         }
-
-
-# # ============================
-# # FastAPI Endpoint
-# # ============================
-# @app.post("/search")
-# async def search_and_store(request: SearchRequest):
-#     return await perform_search(request.query, request.language, request.country)
-
-
-# # ============================
-# # Terminal Search Runner
-# # ============================
-# if __name__ == "__main__":
-#     async def terminal_search():
-#         query = input("🔍 Enter product name to search: ").strip()
-#         if not query:
-#             print("⚠️ Please enter a valid product name.")
-#             return
-
-#         print("\n🔎 Searching, please wait...\n")
-#         result = await perform_search(query)
-
-#         if "error" in result:
-#             print("❌ Error:", result["error"])
-#             return
-
-#         print(f"✅ Scraped & stored successfully!")
-#         print(f"🧾 {result['items_cleaned']} products found.\n")
-
-#         # Display top 5 cleaned products
-#         for i, item in enumerate(result["cleaned_products"][:5], start=1):
-#             print(f"🛍️  {i}. {item['title']}")
-#             print(f"     💰 Price: {item.get('price')}")
-#             print(f"     🏷️ Brand: {item.get('brand')}")
-#             print(f"     🌐 Source: {item.get('source')}")
-#             print(f"     🔗 Link: {item.get('link')}\n")
-
-#     asyncio.run(terminal_search())
-# import asyncio
-# import httpx
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-# from typing import Optional
-# from pymongo import MongoClient
-# from dotenv import load_dotenv
-# from fastapi.middleware.cors import CORSMiddleware
-# import os
-# import datetime
-
-# # ============================
-# # Load Environment Variables
-# # ============================
-# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-
-# api_keys_env = os.getenv("SCRAPINGDOG_API_KEYS")
-# if not api_keys_env:
-#     raise EnvironmentError("❌ SCRAPINGDOG_API_KEYS not found. Check your .env file path or content.")
-
-# API_KEYS = api_keys_env.split(",")
-# current_index = 0
-
-
-# def get_key():
-#     global current_index
-#     return API_KEYS[current_index].strip()
-
-
-# def rotate_key():
-#     global current_index
-#     current_index = (current_index + 1) % len(API_KEYS)
-#     print(f"🔄 API key rotated → index {current_index}")
-
-
-# # ============================
-# # MongoDB Setup
-# # ============================
-# client = MongoClient(os.getenv("MONGODB_URI"))
-# db = client["shopping_data"]
-
-
-# def init_collections(db):
-#     required_collections = {
-#         "raw_products": [("query", 1), ("timestamp", -1)],
-#         "clean_products": [("query", 1), ("timestamp", -1)],
-#     }
-
-#     existing = db.list_collection_names()
-#     for col, indexes in required_collections.items():
-#         if col not in existing:
-#             db.create_collection(col)
-#         for field, order in indexes:
-#             db[col].create_index([(field, order)])
-
-
-# init_collections(db)
-# raw_collection = db["raw_products"]
-# clean_collection = db["clean_products"]
-
-# # ============================
-# # FastAPI App + CORS
-# # ============================
-# app = FastAPI()
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],  # You can restrict to ["http://localhost:5173"] if using Vite
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-
-# @app.get("/")
-# def home():
-#     return {"message": "🚀 Scraper API is running! Use /search to query products."}
-
-
-# class SearchRequest(BaseModel):
-#     query: str
-#     language: Optional[str] = "en"
-#     country: Optional[str] = "in"
-
-
-# # ============================
-# # Async immersive fetch
-# # ============================
-# async def fetch_immersive_async(client, link: str, retries: int = 2):
-#     if not link:
-#         return None
-#     for attempt in range(retries):
-#         try:
-#             r = await client.get(link, timeout=10)
-#             if r.status_code == 200:
-#                 return r.json()
-#             if r.status_code in [403, 429]:
-#                 await asyncio.sleep(0.25)
-#                 continue
-#         except Exception as e:
-#             print("❌ Immersive fetch error:", e)
-#         await asyncio.sleep(0.1)
-#     return None
-
-
-# # ============================
-# # Clean immersive data
-# # ============================
-# def extract_clean_immersive(raw_immersive):
-#     if not raw_immersive:
-#         return None
-#     brand = raw_immersive.get("brand")
-#     thumbs = raw_immersive.get("thumbnails", [])
-#     stores = raw_immersive.get("stores", [])
-#     if not brand or not thumbs or not isinstance(thumbs, list) or not thumbs[0]:
-#         return None
-#     if not stores or not isinstance(stores, list) or not stores[0].get("link"):
-#         return None
-#     return {"brand": brand, "thumbnail": thumbs[0], "link": stores[0]["link"]}
-
-
-# # ============================
-# # Main search function
-# # ============================
-# async def perform_search(query: str, language: str = "en", country: str = "in"):
-#     global current_index
-#     base_url = "https://api.scrapingdog.com/google_shopping"
-#     attempts = 0
-#     max_attempts = len(API_KEYS)
-
-#     async with httpx.AsyncClient() as client_http:
-#         while attempts < max_attempts:
-#             params = {
-#                 "api_key": get_key(),
-#                 "query": query,
-#                 "language": language,
-#                 "country": country,
-#             }
-#             response = await client_http.get(base_url, params=params)
-#             if response.status_code == 200:
-#                 break
-#             if response.status_code in [403, 429]:
-#                 rotate_key()
-#                 attempts += 1
-#                 continue
-#             return {"error": f"API Error: {response.status_code}", "details": response.text}
-
-#         data = response.json()
-#         shopping_results = data.get("shopping_results", [])
-#         raw_entry_id = raw_collection.insert_one({
-#             "query": query.lower(),
-#             "raw_results": data,
-#             "timestamp": datetime.datetime.utcnow(),
-#         }).inserted_id
-
-#         immersive_links = [item.get("scrapingdog_immersive_product_link") for item in shopping_results]
-#         tasks = [fetch_immersive_async(client_http, link) for link in immersive_links]
-#         immersive_results = await asyncio.gather(*tasks)
-
-#         cleaned_items = []
-#         for item, immersive_raw in zip(shopping_results, immersive_results):
-#             immersive_clean = extract_clean_immersive(immersive_raw)
-#             if not immersive_clean:
-#                 continue
-#             availability = item.get("availability", "").lower()
-#             in_stock = None
-#             if "in stock" in availability:
-#                 in_stock = True
-#             elif "out" in availability or "unavailable" in availability:
-#                 in_stock = False
-
-#             cleaned_items.append({
-#                 "title": item.get("title"),
-#                 "source": item.get("source"),
-#                 "reviews": item.get("reviews"),
-#                 "rating": item.get("rating"),
-#                 "price": item.get("price"),
-#                 "brand": immersive_clean["brand"],
-#                 "thumbnail": immersive_clean["thumbnail"],
-#                 "link": immersive_clean["link"],
-#                  "inStock": in_stock,
-#             })
-
-#         clean_collection.insert_one({
-#             "query": query.lower(),
-#             "cleaned_products": cleaned_items,
-#             "raw_reference_id": raw_entry_id,
-#             "timestamp": datetime.datetime.utcnow(),
-#         })
-
-#         return {"message": "Scraped & stored successfully", "items_cleaned": len(cleaned_items), "cleaned_products": cleaned_items}
-
-
-# @app.post("/search")
-# async def search_and_store(request: SearchRequest):
-#     return await perform_search(request.query, request.language, request.country)
-# main.py
 import asyncio
-import httpx
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Optional
-from pymongo import MongoClient
-from dotenv import load_dotenv
-from fastapi.middleware.cors import CORSMiddleware
+import json
 import os
-import datetime
+import sys
+from fastapi import FastAPI, Query
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from dotenv import load_dotenv
 
-# ============================
-# Load Environment Variables
-# ============================
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+# Crawl4AI Core Imports
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, LLMConfig
+from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import PruningContentFilter
 
-api_keys_env = os.getenv("SCRAPINGDOG_API_KEYS")
-if not api_keys_env:
-    raise EnvironmentError("❌ SCRAPINGDOG_API_KEYS not found. Check your .env file path or content.")
+load_dotenv()
 
-API_KEYS = api_keys_env.split(",")
-current_index = 0
+# Fix for Windows SSL/Event Loop crashes
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+app = FastAPI(title="Tycoon Aggregator: True Hybrid")
 
-def get_key():
-    global current_index
-    return API_KEYS[current_index].strip()
+# --- 1. KEY ROTATOR ---
+# class GeminiKeyRotator:
+#     def __init__(self, keys: List[str]):
+#         self.keys = [k.strip() for k in keys if k.strip()]
+#         self.index = 0
+#     def get_key(self):
+#         key = self.keys[self.index]
+#         self.index = (self.index + 1) % len(self.keys)
+#         return key
 
+# keys_list = os.getenv("GEMINI_KEYS", "").split(",")
+# rotator = GeminiKeyRotator(keys_list)
 
-def rotate_key():
-    global current_index
-    current_index = (current_index + 1) % len(API_KEYS)
-    print(f"🔄 API key rotated → index {current_index}")
+import asyncio
+import json
+import os
+import sys
+from datetime import datetime
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from fastapi import FastAPI, Query
+from dotenv import load_dotenv
 
+# Crawl4AI Core
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy, LLMExtractionStrategy
+from crawl4ai import LLMConfig
 
-# ============================
-# MongoDB Setup
-# ============================
-client = MongoClient(os.getenv("MONGODB_URI"))
-db = client["shopping_data"]
+load_dotenv()
 
+# Windows Event Loop Fix
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-def init_collections(db):
-    required_collections = {
-        "raw_products": [("query", 1), ("timestamp", -1)],
-        "clean_products": [("query", 1), ("timestamp", -1)],
+app = FastAPI(title="Pro Aggregator: CSS + LLM Fallback")
+
+# --- 1. DATA SCHEMA ---
+class ProductSchema(BaseModel):
+    title: str = Field(..., description="Full name/title of the product")
+    price: str = Field(..., description="Price with currency symbol")
+    rating: Optional[str] = Field(None, description="Star rating (e.g., 4.5 out of 5)")
+    reviews: Optional[str] = Field(None, description="Number of reviews or ratings")
+    brand: Optional[str] = Field(None, description="Brand name of the product")
+    thumbnail: Optional[str] = Field(None, description="Direct URL of the product image")
+    link: str = Field(..., description="Full absolute URL to the product")
+    source: str = Field(..., description="The website name (e.g., Amazon, Flipkart)")
+
+# --- 2. MODULAR SITE SELECTORS ---
+# We use specific CSS paths for each site to ensure speed and zero-token cost.
+SITE_CONFIGS = {
+    "Amazon": {
+        "baseSelector": "div.s-result-item[data-component-type='s-search-result']",
+        "fields": [
+            {"name": "title", "selector": "h2 span", "type": "text"},
+            {"name": "price", "selector": ".a-price-whole", "type": "text"},
+            {"name": "rating", "selector": "span.a-icon-alt", "type": "text"},
+            {"name": "reviews", "selector": "span.a-size-base.s-underline-text", "type": "text"},
+            {"name": "thumbnail", "selector": "img.s-image", "type": "attribute", "attribute": "src"},
+            {"name": "link", "selector": "a.a-link-normal", "type": "attribute", "attribute": "href"}
+        ]
+    },
+    "Flipkart": {
+        "baseSelector": "div[data-id]",
+        "fields": [
+            {"name": "title", "selector": "div.KzDlHZ, div.w_U96n, a.s1Q9rs", "type": "text"},
+            {"name": "price", "selector": "div.Nx9Wp0, div._30jeq3", "type": "text"},
+            {"name": "rating", "selector": "div.XQD_v7, div._3LWZlK", "type": "text"},
+            {"name": "reviews", "selector": "span.Wphh3N, span._2_R_oE", "type": "text"},
+            {"name": "thumbnail", "selector": "img.DByoH4, img._396cs4", "type": "attribute", "attribute": "src"},
+            {"name": "link", "selector": "a", "type": "attribute", "attribute": "href"}
+        ]
+    },
+    "Myntra": {
+        "baseSelector": "li.product-base",
+        "fields": [
+            {"name": "title", "selector": "h4.product-product", "type": "text"},
+            {"name": "price", "selector": "span.product-discountedPrice", "type": "text"},
+            {"name": "rating", "selector": "div.product-ratingsContainer", "type": "text"},
+            {"name": "reviews", "selector": "div.product-ratingsCount", "type": "text"},
+            {"name": "thumbnail", "selector": "img", "type": "attribute", "attribute": "src"},
+            {"name": "link", "selector": "a", "type": "attribute", "attribute": "href"}
+        ]
     }
+}
 
-    existing = db.list_collection_names()
-    for col, indexes in required_collections.items():
-        if col not in existing:
-            db.create_collection(col)
-        for field, order in indexes:
-            db[col].create_index([(field, order)])
+# --- 3. SCRAPING ENGINE WITH FALLBACK ---
+async def scrape_with_logic(crawler, name, url, query):
+    # Try CSS First
+    schema = SITE_CONFIGS.get(name)
+    css_strategy = JsonCssExtractionStrategy(schema)
+    config = CrawlerRunConfig(
+        extraction_strategy=css_strategy, 
+        cache_mode=CacheMode.BYPASS, 
+        magic=True,
+        wait_until="domcontentloaded",
+        remove_overlay_elements=True
+    )
+    
+    print(f"⚡ Site: {name} | Strategy: CSS")
+    result = await crawler.arun(url=url, config=config)
+    
+    try:
+        data = json.loads(result.extracted_content) if result.extracted_content else []
+    except:
+        data = []
 
-
-init_collections(db)
-raw_collection = db["raw_products"]
-clean_collection = db["clean_products"]
-
-# ============================
-# FastAPI App + CORS
-# ============================
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production restrict to your frontend origin(s)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/")
-def home():
-    return {"message": "🚀 Scraper API is running! Use /search to query products."}
+    # FALLBACK: If CSS fails, use Gemini (LLM)
+    if not data or len(data) < 2:
+        print(f"🚨 Site: {name} | Strategy: FALLBACK (Gemini)")
 
 
-class SearchRequest(BaseModel):
-    query: str
-    language: Optional[str] = "en"
-    country: Optional[str] = "in"
-
-
-# ============================
-# Async immersive fetch
-# ============================
-async def fetch_immersive_async(client, link: str, retries: int = 2):
-    if not link:
-        return None
-    for attempt in range(retries):
-        try:
-            r = await client.get(link, timeout=10)
-            if r.status_code == 200:
-                return r.json()
-            if r.status_code in [403, 429]:
-                await asyncio.sleep(0.25)
-                continue
-        except Exception as e:
-            print("❌ Immersive fetch error:", e)
-        await asyncio.sleep(0.1)
-    return None
-
-
-# ============================
-# Clean immersive data
-# ============================
-def extract_clean_immersive(raw_immersive):
-    if not raw_immersive:
-        return None
-    brand = raw_immersive.get("brand")
-    thumbs = raw_immersive.get("thumbnails", [])
-    stores = raw_immersive.get("stores", [])
-    if not brand or not thumbs or not isinstance(thumbs, list) or not thumbs[0]:
-        return None
-    if not stores or not isinstance(stores, list) or not stores[0].get("link"):
-        return None
-    return {"brand": brand, "thumbnail": thumbs[0], "link": stores[0]["link"]}
-
-
-# ============================
-# Helper: normalize availability -> boolean
-# ============================
-def parse_availability_to_bool(raw_avail) -> bool:
-    """
-    Normalize availability information to a boolean.
-    Returns True for in-stock/available signals, False otherwise.
-    """
-    if raw_avail is None:
-        return False
-
-    # If already boolean, return it
-    if isinstance(raw_avail, bool):
-        return raw_avail
-
-    text = str(raw_avail).strip().lower()
-
-    # tokens that indicate availability
-    positive_tokens = (
-        "in stock",
-        "available",
-        "instock",
-        "ships",
-        "usually dispatched",
-        "usually dispatched in",
-        "usually dispatched within",
-        "in stock now",
-        "in stock and ready",
+    # 1. Define Strategy
+    llm_strategy = LLMExtractionStrategy(
+        llm_config=LLMConfig(
+            provider="cerebras/gpt-oss-120b", # Current stable version
+            api_token=os.getenv("CEREBRAS_API_KEY")
+        ),
+        schema=ProductSchema.model_json_schema(),
+        extraction_type="schema",
+        instruction=f"Extract exactly 10 {query} products. Include title, price, rating, reviews, and thumbnail URL.",
+        input_format="fit_markdown"
     )
 
-    # tokens that indicate unavailability
-    negative_tokens = ("out of stock", "unavailable", "sold out", "not available")
+    # 2. Define Run Config
+    llm_run_config = CrawlerRunConfig(
+        extraction_strategy=llm_strategy, 
+        magic=True,
+        wait_until="domcontentloaded",
+        remove_overlay_elements=True
+    )
 
-    # if any positive token appears -> True
-    if any(tok in text for tok in positive_tokens):
-        return True
+    # 3. Execute
+    result = await crawler.arun(url=url, config=llm_run_config)
 
-    # if any negative token appears -> False
-    if any(tok in text for tok in negative_tokens):
-        return False
+    if result.success and result.extracted_content:
+        try:
+            data = json.loads(result.extracted_content)
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON Parsing Error: {e}")
+            data = []
+    else:
+        print(f"❌ Scrape Failed: {result.error_message}")
+        data = []
 
-    # fallback: if the string contains 'in' and not 'out', treat as available
-    if "in" in text and "out" not in text:
-        return True
-
-    # default safe fallback
-    return False
-
-
-# ============================
-# Main search function
-# ============================
-async def perform_search(query: str, language: str = "en", country: str = "in"):
-    global current_index
-    base_url = "https://api.scrapingdog.com/google_shopping"
-    attempts = 0
-    max_attempts = len(API_KEYS)
-
-    async with httpx.AsyncClient() as client_http:
-        while attempts < max_attempts:
-            params = {
-                "api_key": get_key(),
-                "query": query,
-                "language": language,
-                "country": country,
-            }
-            response = await client_http.get(base_url, params=params)
-            if response.status_code == 200:
-                break
-            if response.status_code in [403, 429]:
-                rotate_key()
-                attempts += 1
-                continue
-            return {"error": f"API Error: {response.status_code}", "details": response.text}
-
-        data = response.json()
-        shopping_results = data.get("shopping_results", [])
-
-        raw_entry_id = raw_collection.insert_one({
-            "query": query.lower(),
-            "raw_results": data,
-            "timestamp": datetime.datetime.utcnow(),
-        }).inserted_id
-
-        immersive_links = [item.get("scrapingdog_immersive_product_link") for item in shopping_results]
-        tasks = [fetch_immersive_async(client_http, link) for link in immersive_links]
-        immersive_results = await asyncio.gather(*tasks)
-
-        cleaned_items = []
-        for item, immersive_raw in zip(shopping_results, immersive_results):
-            immersive_clean = extract_clean_immersive(immersive_raw)
-            if not immersive_clean:
-                continue
-
-            # Normalize availability -> boolean (always True or False)
-            raw_avail = item.get("availability") or ""
-            in_stock = parse_availability_to_bool(raw_avail)
-
-            
-
-            cleaned_items.append({
-                "title": item.get("title"),
-                "source": item.get("source"),
-                "reviews": item.get("reviews"),
-                "rating": item.get("rating"),
-                "price": item.get("price"),
-                "brand": immersive_clean["brand"],
-                "thumbnail": immersive_clean["thumbnail"],
-                "link": immersive_clean["link"],
-
-            })
-
-        clean_collection.insert_one({
-            "query": query.lower(),
-            "cleaned_products": cleaned_items,
-            "raw_reference_id": raw_entry_id,
-            "timestamp": datetime.datetime.utcnow(),
+    # NORMALIZATION: Clean up URLs and Sources
+    base_urls = {
+        "Amazon": "https://www.amazon.in",
+        "Flipkart": "https://www.flipkart.com",
+        "Myntra": "https://www.myntra.com",
+        "Croma": f"https://www.croma.com",
+        "Meesho": f"https://www.meesho.com",
+        "JioMart": f"https://www.jiomart.com"
+    }
+    
+    cleaned_data = []
+    for item in data:
+        # Prepend base URL if link is relative
+        link = item.get('link', '')
+        if link and not link.startswith('http'):
+            link = base_urls.get(name, "") + link
+        
+        cleaned_data.append({
+            "title": item.get("title", "Unknown"),
+            "price": item.get("price", "N/A"),
+            "rating": item.get("rating", "N/A"),
+            "reviews": item.get("reviews", "0"),
+            "thumbnail": item.get("thumbnail"),
+            "link": link,
+            "source": name
         })
+            
+    return cleaned_data
 
-        return {"message": "Scraped & stored successfully", "items_cleaned": len(cleaned_items), "cleaned_products": cleaned_items}
+# --- 4. FASTAPI ENDPOINTS ---
+@app.get("/search")
+async def search_endpoint(q: str = Query(..., description="Product to search")):
+    sources = {
+        "Amazon": f"https://www.amazon.in/s?k={q.replace(' ', '+')}",
+        "Flipkart": f"https://www.flipkart.com/search?q={q.replace(' ', '%20')}",
+        "Croma": f"https://www.croma.com/searchB?q={q.replace(' ', '%20')}",
+        "Meesho": f"https://www.meesho.com/search?q={q.replace(' ', '%20')}",
+        "JioMart": f"https://www.jiomart.com/search/{q.replace(' ', '%20')}",
+        "Myntra": f"https://www.myntra.com/{q.replace(' ', '-')}"
+    }
+    
+    all_results = []
+    # Using a single browser session for multiple tabs (faster)
+    async with AsyncWebCrawler(config=BrowserConfig(headless=True, enable_stealth=True, 
+    user_agent_mode="random")) as crawler:
+        tasks = [scrape_with_logic(crawler, name, url, q) for name, url in sources.items()]
+        batch_results = await asyncio.gather(*tasks)
+        for res in batch_results:
+            all_results.extend(res)
 
+    # Save to JSON file named after query
+    filename = f"search_{q.replace(' ', '_')}_{datetime.now().strftime('%H%M%S')}.json"
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(all_results, f, indent=4)
+        
+    return {
+        "status": "success",
+        "file_saved": filename,
+        "count": len(all_results),
+        "data": all_results
+    }
 
-@app.post("/search")
-async def search_and_store(request: SearchRequest):
-    return await perform_search(request.query, request.language, request.country)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

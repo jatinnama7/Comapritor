@@ -91,258 +91,62 @@ J --> K(Return Cleaned Response to Frontend)
 ```
 
 ---
+# Compareon – Crawl4AI FastAPI scraper
+FastAPI service that scrapes multiple Indian e-commerce sites with CSS-first extraction and an LLM fallback (Cerebras) using Crawl4AI. Each `/search` request generates a local JSON file with the aggregated results.
 
-## 📁 **clean_products**
+- Targets: Amazon, Flipkart, Croma, Meesho, JioMart, Myntra
+- CSS extraction first; if it fails or is too sparse, falls back to LLM extraction
+- Normalizes relative links and saves `search_<query>_<timestamp>.json`
+- Windows-friendly event loop fix included
 
+## Prerequisites
+- Python 3.10+
+- Playwright browsers (first run will download them)
+- Cerebras API key for the LLM fallback: `CEREBRAS_API_KEY`
+
+## Setup
+1) Create and activate a virtual environment
+```
+python -m venv .venv
+.venv\Scripts\activate
+```
+2) Install dependencies
+```
+pip install -r requirements.txt
+python -m playwright install
+```
+3) Add a `.env` file in this folder
+```
+CEREBRAS_API_KEY=your_cerebras_token
+```
+
+## Run the API
+```
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+Call the endpoint:
+```
+GET http://localhost:8000/search?q=iphone 16
+```
+Response (truncated):
 ```json
 {
-  "query": "iphone 16",
-  "cleaned_products": [
-    {
-      "title": "Apple iPhone 16",
-      "source": "amazon.in",
-      "reviews": "17K",
-      "rating": 4.8,
-      "price": "₹66,900",
-      "brand": "Apple",
-      "thumbnail": "https://...image...",
-      "link": "https://reliancedigital.in/..."
-    }
-  ],
-  "raw_reference_id": "ObjectId(...)",
-  "timestamp": "ISODate"
+    "status": "success",
+    "file_saved": "search_iphone_16_142219.json",
+    "count": 24,
+    "data": [{"title": "...", "price": "...", "source": "Amazon", "link": "..."}]
 }
 ```
 
+## File guide
+- `main.py` – CSS-first + LLM fallback aggregator (current default)
+- `onlyCSS.py` – CSS-only variant (no LLM usage)
+- `C4A!_v2.py` – LLM-driven variant with Cerebras
+- `old.py` – legacy ScrapingDog + MongoDB pipeline kept for reference
 
----
-
-# 🧵 **6. Sequence Diagram — Request Lifecycle**
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant FastAPI
-    participant GoogleAPI
-    participant ImmersiveAPI
-    participant MongoDB
-
-    User->>FastAPI: POST /search {query}
-    FastAPI->>GoogleAPI: Fetch Shopping Results
-    GoogleAPI-->>FastAPI: shopping_results[]
-    
-    FastAPI->>MongoDB: Insert raw_products
-    
-    FastAPI->>ImmersiveAPI: Parallel immersive fetch (async gather)
-    ImmersiveAPI-->>FastAPI: immersive_data[i]
-    
-    FastAPI->>FastAPI: strict immersive validation
-    
-    FastAPI->>MongoDB: Insert clean_products
-    
-    FastAPI-->>User: cleaned_products[]
-```
-
----
-
-# 🧠 **7. Code Implementation (Deep Explanation)**
-
+## Notes
+- Playwright needs browser binaries; run `python -m playwright install` once per machine.
+- Without `CEREBRAS_API_KEY`, only the CSS extraction path will work.
 Your final optimized code below is broken into logical blocks with explanations.
 
----
-
-
-## 💠 **7.1 API Key Rotation**
-
-Ensures uninterrupted scraping even when one API key hits rate limits.
-
-```python
-API_KEYS = os.getenv("SCRAPINGDOG_API_KEYS").split(",")
-current_index = 0
-
-def get_key():
-    return API_KEYS[current_index].strip()
-
-def rotate_key():
-    global current_index
-    current_index = (current_index + 1) % len(API_KEYS)
-```
-
-✅ Rotates safely
-✅ Automatically picks next valid key
-
----
-
-
-## 💠 **7.2 MongoDB Initialization + Index Creation**
-
-```python
-def init_collections(db):
-    required = {
-        "raw_products": [("query",1),("timestamp",-1)],
-        "clean_products": [("query",1),("timestamp",-1)]
-    }
-
-    for col, idx in required.items():
-        if col not in db.list_collection_names():
-            db.create_collection(col)
-
-        for field, order in idx:
-            db[col].create_index([(field,order)])
-```
-
-✅ Creates collections
-✅ Adds indexing for faster searches
-✅ First-time safe bootstrapping
-
----
-
-
-## 💠 **7.3 Async Immersive Fetch with Retry + Throttle Handling**
-
-```python
-async def fetch_immersive_async(client, link, retries=2):
-    if not link: return None
-
-    for attempt in range(retries):
-        try:
-            r = await client.get(link, timeout=10)
-            if r.status_code == 200:
-                return r.json()
-
-            if r.status_code in [403, 429]:
-                await asyncio.sleep(0.25)
-                continue
-        except Exception:
-            pass
-
-        await asyncio.sleep(0.1)
-
-    return None
-```
-
-✅ Retry mechanism
-✅ Handles throttling
-✅ Eliminates noisy failures
-✅ Improves stability
-
----
-
-
-## 💠 **7.4 Strict Immersive-Based Data Cleaning**
-
-```python
-def extract_clean_immersive(raw_immersive):
-    if not raw_immersive: return None
-
-    brand = raw_immersive.get("brand")
-    thumbs = raw_immersive.get("thumbnails", [])
-    stores = raw_immersive.get("stores", [])
-
-    if not brand or not thumbs or not thumbs[0]:
-        return None
-    if not stores or not stores[0].get("link"):
-        return None
-
-    return {
-        "brand": brand,
-        "thumbnail": thumbs[0],
-        "link": stores[0]["link"]
-    }
-```
-
-✅ Pure immersive truth
-✅ Only valid structured data
-✅ Zero outer fallback contamination
-✅ Guaranteed consistent UX
-
----
-
-
-## 💠 **7.5 Main Endpoint Logic**
-
-Core orchestration:
-
-```python
-@app.post("/search")
-async def search_and_store(request: SearchRequest):
-```
-
-Steps:
-
-1. Fetch Google Shopping results
-2. Save RAW results
-3. Extract immersive links
-4. Async parallel fetch immersive
-5. Strict immersive filtering
-6. Save cleaned results
-7. Return merged JSON
-
----
-
-
-# 📦 **8. Frontend Integration**
-
-## ✅ Endpoints Exposed
-
-**POST /search**
-
-### Body:
-
-```json
-{
-  "query": "iphone 16",
-  "language": "en",
-  "country": "in"
-}
-```
-
-### Response:
-
-```json
-{
-  "items_cleaned": 25,
-  "cleaned_products": [...]
-}
-```
-
----
-
-
-# 🌐 **9. Frontend UI Recommendation (to match backend richness)**
-
-On UI (React/MERN recommended):
-
-✅ Loading animation
-✅ List/grid card layout
-✅ Sort by price/rating/brand
-✅ Thumbnail
-✅ View in store button (immersive link)
-✅ Source store name (outer source)
-
----
-
-# ⚡ **10. Performance Enhancements Achieved**
-
-| Feature                    | Benefit                          |
-| -------------------------- | -------------------------------- |
-| Async httpx                | 20–30x faster immersive fetching |
-| Strict immersive filtering | Highest accuracy                 |
-| Retry logic                | Resilient to API hiccups         |
-| API key rotation           | Unlimited scraping cycle         |
-| MongoDB indexing           | Fast querying                    |
-| Parallel requests          | Real-time UX                     |
-
----
-
-# 📌 **11. Future-Ready Enhancements**
-
-* 🔥 Add Redis caching
-* 🧠 Rank products by score
-* 📊 Price history graph
-* 📦 Offer comparison
-* ⚡ Batch grouping for low API usage
-* 🛠 Clean dashboard backend
-
----
 
