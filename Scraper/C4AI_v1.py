@@ -18,7 +18,7 @@ async def scrape_with_high_limits(urls):
     # SWITCHING TO GEMINI FOR 1M+ TOKEN LIMIT
     llm_config = LLMConfig(
         provider="gemini/gemini-2.5-flash", 
-        api_token="AIzaSyB-YQRBYry8NKphGS92_95Hm-7O9ao-8qU" # Get for free at aistudio.google.com
+        api_token="Your_Gemini_API_Token_Here",
     )
 
     extraction_strategy = LLMExtractionStrategy(
