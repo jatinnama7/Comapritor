@@ -3,13 +3,19 @@
 /Scraper/Trials/
 /Scraper/scrape_env
 /Scraper/__pycache__/
+/.vscode/
 /Scraper/search_*.json
+/.DS_Store
+/myenv/
+/Legacy/
+/OLD/
 *.pyc
 __pycache__/
 /.venv/
 /Scraper/.venv/
 /.pytest_cache/
 node_modules/
+/Comapritor/.vscode/
 
 # Logs
 *.log

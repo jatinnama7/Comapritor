@@ -1,152 +1,127 @@
 
-# 📦Compareon
-*A High-Performance Real-Time Product Comparison API Using FastAPI, Async HTTP, Immersive Filtering & MongoDB*
+# 📦 Compareon
+FastAPI + Crawl4AI backend that scrapes six Indian e-commerce sites (Amazon, Flipkart, Croma, Meesho, JioMart, Myntra), normalizes results, caps to top 10 per site, writes per-run JSONs into 5-minute buckets, and stores enriched copies in MongoDB.
 
 ---
 
-
-# 🧭 **1. Introduction**
-
-This project is a **real-time product comparison backend** that scrapes product data from Google Shopping via ScrapingDog APIs, with high-precision immersive product details.
-It uses:
-
-* ⚡ **FastAPI** for API server
-* ⚙️ **Async concurrency with httpx**
-* 🔁 **API-key rotation**
-* 🧠 **Strict immersive data filtering strategy**
-* 📦 **MongoDB Atlas** for raw + cleaned data storage
-* 🔍 **Parallel immersive requests with retry + pacing**
-
-✔ Built for speed
-✔ Built for accuracy
-✔ Built for production
+## 🔍 Current approach (concise)
+- `/search` FastAPI route triggers all six scrapers concurrently via `asyncio.gather`.
+- CSS-first extraction everywhere; Flipkart and Meesho use Cerebras LLM extraction (Crawl4AI LLMExtractionStrategy).
+- Links normalized to absolute, prices cleaned; each scraper truncates to 10 items.
+- Outputs land in `results/YYYYMMDD_HHMM/` (5-minute buckets): one aggregated JSON plus per-site JSONs.
+- MongoDB insert adds `search_query` and `created_at`; response returns enriched data (without `_id`) and elapsed seconds.
+- Windows event-loop policy set for asyncio compatibility.
 
 ---
 
-# 🧱 **2. System Architecture Overview**
-
-```mermaid
-flowchart TD
-
-A(User Query Request) --> B(FastAPI /search Endpoint)
-
-B --> C(Google Shopping API Request - Async)
-C -->|200 OK| D(Shopping Results Received)
-
-D --> E(Store to MongoDB - raw_products)
-
-E --> F(Extract Immersive Links)
-
-F --> G(Parallel Immersive Fetch: async + retry)
-G --> H(Strict Immersive Filter)
-
-H --> I(Cleaned Product List)
-
-I --> J(Store to MongoDB - clean_products)
-
-J --> K(Return Cleaned Response to Frontend)
-```
+## 🧱 Architecture
+- Entrypoint: FastAPI app (main.py) exposes `/search`.
+- Workers: six async scraper functions (amazon, flipkart, jiomart, meesho, croma, myntra).
+- Extraction: Crawl4AI AsyncWebCrawler
+  - CSS selectors for Amazon, Croma, JioMart, Myntra
+  - LLMExtractionStrategy (Cerebras) for Flipkart, Meesho
+- Storage: MongoDB Atlas (comparitor_db.products) via PyMongo.
+- Filesystem outputs: timestamp buckets per 5 minutes under results/.
 
 ---
 
-
-# ⚙️ **3. Core Pipeline Logic**
-
-## ✅ **3.1 Data Flow**
-
-1. **User sends query**
-2. **Google Shopping API** returns product list
-3. **Immersive endpoint** returns deep product details
-4. System filters immersive data **STRICTLY**
-5. Only products with valid immersive details ✅ saved
-6. Clean structured results returned to frontend
-
+## 📦 Repository layout (live paths)
+- Scraper/main.py – FastAPI app, aggregator, Mongo writes, bucketed output.
+- Scraper/amazon_scraper.py – Amazon CSS scraper.
+- Scraper/flipkart_scraper.py – Flipkart LLM scraper (Cerebras).
+- Scraper/jiomart_scraper.py – JioMart CSS scraper with junk filtering.
+- Scraper/meesho_scraper.py – Meesho LLM scraper (Cerebras).
+- Scraper/croma_scraper.py – Croma CSS scraper with retry fallback.
+- Scraper/myntra_scraper.py – Myntra CSS scraper.
 ---
 
-
-# 🧩 **4. Key Decisions in System Design**
-
-## ✅ Strict Immersive Filtering (your requirement)
-
-* DO NOT trust outer product thumbnail/link
-* ONLY trust immersive fields
-* If immersive object is missing:
-
-  * **skip that product**
-* Guarantees **highest data purity**
-
----
-
-
-# 🔑 **5. Database Schema (MongoDB)**
-
-## 📁 **raw_products**
-
-```json
-{
-  "query": "iphone 16",
-  "raw_results": { ...full Google Shopping JSON... },
-  "timestamp": "ISODate"
-}
-```
-
----
-# Compareon – Crawl4AI FastAPI scraper
-FastAPI service that scrapes multiple Indian e-commerce sites with CSS-first extraction and an LLM fallback (Cerebras) using Crawl4AI. Each `/search` request generates a local JSON file with the aggregated results.
-
-- Targets: Amazon, Flipkart, Croma, Meesho, JioMart, Myntra
-- CSS extraction first; if it fails or is too sparse, falls back to LLM extraction
-- Normalizes relative links and saves `search_<query>_<timestamp>.json`
-- Windows-friendly event loop fix included
-
-## Prerequisites
+## 🛠 Tech stack and external APIs
+- FastAPI (HTTP server)
+- Crawl4AI (AsyncWebCrawler, JsonCssExtractionStrategy, LLMExtractionStrategy)
+- Playwright (browser automation used by Crawl4AI)
+- Cerebras LLM API (provider `cerebras/gpt-oss-120b` via Crawl4AI) for Flipkart/Meesho
+- MongoDB Atlas (PyMongo client)
 - Python 3.10+
-- Playwright browsers (first run will download them)
-- Cerebras API key for the LLM fallback: `CEREBRAS_API_KEY`
 
-## Setup
+---
+
+## 🔐 Configuration (.env in Scraper/)
+```
+MONGODB_URI=your_mongodb_uri
+CEREBRAS_API_KEY=your_cerebras_api_key
+GROQ_API_KEY=optional_if_used_elsewhere
+GEMINI_API_KEY=optional_if_used_elsewhere
+GEMINI_KEYS=optional_if_used_elsewhere
+```
+Keep Scraper/.env out of git; rotate any key that was ever committed.
+
+---
+
+## ⚙️ Setup
 1) Create and activate a virtual environment
 ```
 python -m venv .venv
 .venv\Scripts\activate
 ```
-2) Install dependencies
+2) Install dependencies and Playwright browsers
 ```
 pip install -r requirements.txt
 python -m playwright install
 ```
-3) Add a `.env` file in this folder
-```
-CEREBRAS_API_KEY=your_cerebras_token
-```
+3) Create Scraper/.env with the values above.
 
-## Run the API
+---
+
+## ▶️ Run the API
+From Scraper/:
 ```
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
-Call the endpoint:
+Request example:
 ```
 GET http://localhost:8000/search?q=iphone 16
 ```
-Response (truncated):
-```json
+Response shape (truncated):
+```
 {
-    "status": "success",
-    "file_saved": "search_iphone_16_142219.json",
-    "count": 24,
-    "data": [{"title": "...", "price": "...", "source": "Amazon", "link": "..."}]
+  "status": "success",
+  "total_results": 42,
+  "file_saved": "aggregated_iphone_16.json",
+  "elapsed_seconds": 12.345,
+  "results": [ { "title": "...", "price": "₹...", "source": "Amazon", ... } ]
 }
 ```
 
-## File guide
-- `main.py` – CSS-first + LLM fallback aggregator (current default)
-- `onlyCSS.py` – CSS-only variant (no LLM usage)
-- `C4A!_v2.py` – LLM-driven variant with Cerebras
-- `old.py` – legacy ScrapingDog + MongoDB pipeline kept for reference
+---
 
-## Notes
-- Playwright needs browser binaries; run `python -m playwright install` once per machine.
-- Without `CEREBRAS_API_KEY`, only the CSS extraction path will work.
-Your final optimized code below is broken into logical blocks with explanations.
+## 📤 Outputs and storage
+- Files: results/YYYYMMDD_HHMM/
+  - aggregated_<query>.json (all merged items)
+  - amazon_results.json, croma_<query>.json, flipkart_<query>.json, jiomart_<query>.json, meesho_<query>.json, myntra_results.json
+- Database: comparitor_db.products with added fields `search_query`, `created_at`.
+
+---
+
+## 🧠 Per-site scraper behavior
+- Amazon: CSS extraction; prefixes price with ₹ when missing.
+- Flipkart: Cerebras LLM extraction; requires CEREBRAS_API_KEY.
+- JioMart: CSS extraction; filters junk (case/cover/glass/adapter); normalizes links.
+- Meesho: Cerebras LLM extraction with scroll JS; requires CEREBRAS_API_KEY.
+- Croma: CSS extraction with retry (networkidle -> domcontentloaded fallback).
+- Myntra: CSS extraction; normalizes links.
+All write into the shared 5-minute bucket.
+
+---
+
+## 🔒 Security and hygiene
+- Secrets are only read from environment variables; avoid logging them.
+
+---
+
+## 🧭 Troubleshooting
+- Playwright browsers missing: run `python -m playwright install`.
+- Cerebras key missing: Flipkart/Meesho skip with a warning.
+- Empty results: check site reachability/selectors; some sites throttle or alter markup.
+- Mongo issues: verify MONGODB_URI and network access to Atlas.
 
 
