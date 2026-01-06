@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 from datetime import datetime
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
@@ -14,6 +15,7 @@ async def scrape_croma(query: str):
         "baseSelector": "li.product-item, .cp-product, [data-testid='product-card']",
         "fields": [
             {"name": "title", "selector": "h3, .plp-product-name, .product-title", "type": "text"},
+            {"name": "brand", "selector": ".product-brand, .plp-product-brand", "type": "text"},
             {"name": "price", "selector": ".amount, .new-price, .plp-srp-new-price", "type": "text"},
             {"name": "rating", "selector": ".cp-rating, .rating-stars", "type": "text"},
             {"name": "reviews", "selector": ".rating-count, .review-count", "type": "text"},
@@ -73,8 +75,19 @@ async def scrape_croma(query: str):
             continue
         if not link.startswith("http"):
             link = "https://www.croma.com" + link
+        title = (item.get("title") or "").strip()
+        brand_val = (item.get("brand") or "").strip()
+        if not brand_val and title:
+            tokens = re.split(r"[\s,|]+", title)
+            for tok in tokens:
+                tclean = re.sub(r"[^A-Za-z0-9&.-]", "", tok)
+                if tclean and not tclean[0].isdigit() and tclean.lower() not in {"with", "for", "pack", "combo", "set", "inch", "cm", "gb", "tb"}:
+                    brand_val = tclean
+                    break
+
         cleaned.append({
-            "title": (item.get("title") or "").strip(),
+            "title": title,
+            "brand": brand_val,
             "price": (item.get("price") or "N/A").strip(),
             "rating": (item.get("rating") or "N/A").strip(),
             "reviews": (item.get("reviews") or "0").strip(),
@@ -82,6 +95,17 @@ async def scrape_croma(query: str):
             "link": link,
             "source": "Croma"
         })
+
+    # Filter to keep items matching query keywords to avoid unrelated products
+    keywords = [kw.lower() for kw in query.split() if kw]
+    if keywords:
+        filtered = []
+        for itm in cleaned:
+            title_l = itm["title"].lower()
+            if all(kw in title_l for kw in keywords):
+                filtered.append(itm)
+        if filtered:
+            cleaned = filtered
 
     cleaned = cleaned[:10]
     now = datetime.now()

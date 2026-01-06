@@ -15,6 +15,7 @@ class FlipkartProduct(BaseModel):
     price: str = Field(..., description="Current price with currency symbol")
     rating: str = Field("N/A", description="Numeric rating out of 5")
     reviews: str = Field("0", description="Number of reviews or ratings")
+    brand: Optional[str] = Field(None, description="Brand name of the product")
     thumbnail: str = Field(..., description="Image URL of the product")
     link: str = Field(..., description="Full URL to the product page")
 
@@ -36,7 +37,7 @@ async def scrape_flipkart(query: str):
         instruction=(
             f"Extract the top 10 products from this Flipkart search page for '{query}'. "
             "Ignore sponsored 'Ad' results if they are not relevant. "
-            "Ensure the link is a full URL. Capture the clean price and numeric rating."
+            "Ensure the link is a full URL. Capture the clean price, numeric rating, and brand."
         ),
         input_format="fit_markdown"
     )
@@ -78,6 +79,7 @@ async def scrape_flipkart(query: str):
             link = "https://www.flipkart.com" + link
         cleaned.append({
             "title": item.get("title", ""),
+            "brand": item.get("brand", ""),
             "price": item.get("price", "N/A"),
             "rating": item.get("rating", "N/A"),
             "reviews": item.get("reviews", "0"),

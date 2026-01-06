@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 from datetime import datetime
 def _bucket_dir() -> str:
     now = datetime.now()
@@ -16,6 +17,7 @@ async def scrape_amazon(query: str):
         "baseSelector": "div.s-result-item[data-component-type='s-search-result']",
         "fields": [
             {"name": "title", "selector": ".a-text-normal", "type": "text"},
+            {"name": "brand", "selector": "span.a-size-base-plus, span.a-size-base", "type": "text"},
             {"name": "price", "selector": ".a-price-whole", "type": "text"},
             {"name": "rating", "selector": "span.a-icon-alt", "type": "text"},
             {"name": "reviews", "selector": "span.a-size-base.s-underline-text", "type": "text"},
@@ -52,10 +54,24 @@ async def scrape_amazon(query: str):
         if not link.startswith("http"):
             link = "https://www.amazon.in" + link
 
+        title = item.get("title", "")
+        brand_val = (item.get("brand") or "").strip()
+        if brand_val.lower().find("bought") != -1:
+            brand_val = ""
+        if not brand_val and title:
+            # pick first meaningful token
+            tokens = re.split(r"\s+", title)
+            for tok in tokens:
+                tclean = re.sub(r"[^A-Za-z0-9&.-]", "", tok)
+                if tclean and tclean.lower() not in {"pack", "set", "combo", "of", "for", "men", "women", "unisex", "kids", "boy", "girl", "girls", "boys"}:
+                    brand_val = tclean
+                    break
+
         price_raw = (item.get("price") or "N/A").strip()
         price_val = price_raw if price_raw.startswith("₹") or price_raw == "N/A" else f"₹{price_raw}"
         cleaned.append({
-            "title": item.get("title", ""),
+            "title": title,
+            "brand": brand_val,
             "price": price_val,
             "rating": item.get("rating", "N/A"),
             "reviews": item.get("reviews", "0"),

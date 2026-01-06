@@ -44,6 +44,7 @@ async def scrape_meesho(search_query: str):
         "IMPORTANT: Every product MUST have a link and a price. "
         "Find the link for each product (usually contains /p/). "
         "Capture the 'src' attribute of the main product image for the thumbnail. "
+        "Include the brand when it is available. "
         "Ignore accessories like cases or chargers if they are not the main product."
     )
 

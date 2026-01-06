@@ -11,6 +11,7 @@ async def scrape_myntra(query: str):
         "baseSelector": "li.product-base",
         "fields": [
             {"name": "title", "selector": "h4.product-product", "type": "text"},
+            {"name": "brand", "selector": "h3.product-brand, .product-brand", "type": "text"},
             {"name": "price", "selector": "span.product-discountedPrice", "type": "text"},
             {"name": "rating", "selector": "div.product-ratingsContainer", "type": "text"},
             {"name": "thumbnail", "selector": "img", "type": "attribute", "attribute": "src"},
@@ -47,6 +48,7 @@ async def scrape_myntra(query: str):
             link = "https://www.myntra.com/" + link
         cleaned.append({
             "title": item.get("title", ""),
+            "brand": (item.get("brand") or "").strip(),
             "price": item.get("price", "N/A"),
             "rating": item.get("rating", "N/A"),
             "reviews": item.get("reviews", "0"),
