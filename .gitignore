@@ -1,4 +1,4 @@
-.env
+
 /Scraper/.env
 /Scraper/Trials/
 /Scraper/scrape_env
@@ -6,7 +6,7 @@
 /.vscode/
 /Scraper/search_*.json
 /.DS_Store
-/myenv/
+.myenv
 /Legacy/
 /OLD/
 *.pyc
@@ -16,6 +16,7 @@ __pycache__/
 /.pytest_cache/
 node_modules/
 /Comapritor/.vscode/
+
 
 # Logs
 *.log
