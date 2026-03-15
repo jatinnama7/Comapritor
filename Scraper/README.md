@@ -20,7 +20,10 @@ It now also supports a **fast-first** mode with **Redis/Memurai caching** so the
 ## ⚡ Fast-first + Redis (new)
 - **Fast path:** runs the 4 non-LLM scrapers first (Amazon + JioMart + Croma + Myntra) and returns immediately.
 - **Background completion:** continues with the 2 LLM scrapers (Flipkart + Meesho), merges everything, then saves **only the final merged results** to MongoDB Atlas.
+- Both the fast and background phases use the same simple per-site retry (retry on error or 0 items).
 - **Redis/Memurai cache (optional):** stores fast results, final results, status, and a short lock to prevent duplicate runs for the same query.
+- **Robust cache matching:** normalized query matching plus variant lookup (spacing/hyphen/article/plural forms) before launching fresh scraping.
+- **Concurrency hardening:** `/search_fast` acquires lock before scraping; if already running for same query, returns `mode="locked"` with `retry_after`.
 - Implemented as **additive endpoints** so the existing `/search` behavior remains intact.
 
 ---
@@ -32,7 +35,8 @@ It now also supports a **fast-first** mode with **Redis/Memurai caching** so the
 - Workers: six async scraper functions (amazon, flipkart, jiomart, meesho, croma, myntra)
 - Orchestration:
   - `orchestrator.py` runs fast scrapers first and schedules background completion
-  - `cache.py` provides Redis/Memurai cache helpers + simple locking
+  - `cache.py` provides Redis/Memurai cache helpers, simple locking, and query-index registration
+  - `scheduler/` provides APScheduler daily warmup, idempotency lock, and warmup metrics logging
 - Storage:
   - MongoDB Atlas (`comparitor_db.products`) via PyMongo
   - Redis/Memurai cache (optional)
@@ -44,6 +48,11 @@ It now also supports a **fast-first** mode with **Redis/Memurai caching** so the
 - Scraper/main.py – FastAPI app, endpoints.
 - Scraper/orchestrator.py – fast-first orchestration + background completion + Mongo persist.
 - Scraper/cache.py – Redis helper (JSON cache, status keys, simple lock).
+- Scraper/scheduler/background.py – APScheduler lifecycle and daily cron registration.
+- Scraper/scheduler/jobs.py – daily warmup pipeline (top queries → scrape → persist).
+- Scraper/scheduler/idempotency.py – day-level lock and stale lock recovery.
+- Scraper/scheduler/metrics.py – warmup run summary logging/status payload.
+- Scraper/scheduler/trending_source.py – LLM-based top-query source with retry and static fallback.
 - Scraper/amazon_scraper.py – Amazon CSS scraper.
 - Scraper/flipkart_scraper.py – Flipkart LLM scraper (Cerebras).
 - Scraper/jiomart_scraper.py – JioMart CSS scraper with junk filtering.
@@ -60,6 +69,7 @@ It now also supports a **fast-first** mode with **Redis/Memurai caching** so the
 - Cerebras LLM API (provider `cerebras/gpt-oss-120b` via Crawl4AI) for Flipkart/Meesho
 - MongoDB Atlas (PyMongo client)
 - Redis (via Memurai/Redis) for caching + locking (optional)
+- APScheduler (daily warmup cron)
 - Python 3.10+
 
 ---
@@ -67,7 +77,9 @@ It now also supports a **fast-first** mode with **Redis/Memurai caching** so the
 ## 🔐 Configuration (.env in Scraper/)
 ```
 MONGODB_URI=your_mongodb_uri
-CEREBRAS_API_KEY=your_cerebras_api_key
+# LLM keys used by Flipkart/Meesho scrapers
+CEREBRAS_API_KEY1=your_cerebras_api_key
+CEREBRAS_API_KEY2=your_cerebras_api_key
 GROQ_API_KEY=optional_if_used_elsewhere
 GEMINI_API_KEY=optional_if_used_elsewhere
 GEMINI_KEYS=optional_if_used_elsewhere
@@ -84,6 +96,28 @@ REDIS_FAST_TTL_SECONDS=600
 REDIS_FINAL_TTL_SECONDS=86400
 # lock TTL to prevent stampedes per query
 REDIS_LOCK_TTL_SECONDS=600
+
+# Simple per-site retry (used by /search)
+SCRAPER_RETRY_MAX_ATTEMPTS=3
+SCRAPER_RETRY_BASE_DELAY_SECONDS=1
+SCRAPER_RETRY_MAX_DELAY_SECONDS=10
+
+# Admin endpoints protection (required for /admin/* routes)
+ADMIN_API_KEY=your_admin_api_key
+
+# Daily warmup scheduler (runs top-query warmup job)
+SCHEDULER_ENABLED=1
+SCHEDULER_TIMEZONE=Asia/Kolkata
+SCHEDULER_RUN_HOUR=2
+SCHEDULER_RUN_MINUTE=0
+
+# Warmup job tuning
+WARMUP_QUERY_COUNT=100
+WARMUP_BATCH_SIZE=5
+WARMUP_SKIP_CACHED=1
+WARMUP_LLM_RETRY_MINUTES=10
+WARMUP_LLM_RETRY_BASE_SECS=5
+WARMUP_LOCK_STALE_MINUTES=30
 ```
 Keep Scraper/.env out of git; rotate any key that was ever committed.
 
@@ -173,6 +207,8 @@ Response shape (truncated):
 - `comparitor:search:final:<normalized_query>` – cached final merged results
 - `comparitor:search:status:<normalized_query>` – status string
 - `comparitor:search:lock:<normalized_query>` – lock to avoid duplicate runs
+- `comparitor:search:error:<normalized_query>` – last error payload (only set on failures)
+- `comparitor:search:index` – sorted-set index of normalized queries seen recently
 
 ---
 
@@ -186,7 +222,9 @@ Response shape (truncated):
 ### 2) Fast-first (new)
 - `GET /search_fast?q=...`
   - Returns quickly with results from the 4 non-LLM sources.
+  - Uses robust cache lookup across normalized query variants before scraping.
   - Schedules background completion for the 2 LLM sources; merges, caches final, and saves to MongoDB.
+  - If another same-query run is active, returns `{"status":"processing","mode":"locked","retry_after":5}`.
 
 ### 3) Status/progress (new)
 - `GET /search_status?q=...`
@@ -197,6 +235,14 @@ Response shape (truncated):
 - `GET /search_final?q=...`
   - Returns final results from Redis if available.
   - Otherwise falls back to MongoDB and returns the most recent completed run for that query (and backfills Redis).
+
+### 5) Warmup admin endpoints (new)
+- `POST /admin/warmup/trigger`
+  - Protected by `X-Admin-Key` (`ADMIN_API_KEY` in env).
+  - Triggers warmup job in background.
+- `GET /admin/warmup/status`
+  - Protected by `X-Admin-Key`.
+  - Returns scheduler state + last warmup metrics + `done_today` flag.
 
 ---
 

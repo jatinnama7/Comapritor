@@ -3,12 +3,13 @@ import json
 import os
 import sys
 import urllib.parse
+from contextlib import asynccontextmanager
 from datetime import datetime
 from datetime import timedelta
 import time
-from typing import List
+from typing import List, Callable, Awaitable, Any, Optional
 
-from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks, Header
 from pymongo import MongoClient
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -25,8 +26,11 @@ from cache import RedisCache
 from orchestrator import (
     background_complete_and_persist,
     get_cached_results,
+    get_cached_results_robust,
     normalize_query,
+    register_query_in_index,
     run_fast_scrapers,
+    run_fast_scrapers_with_errors,
 )
 
 load_dotenv()
@@ -34,9 +38,34 @@ load_dotenv()
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-app = FastAPI(title="Comparitor Aggregator")
-
 cache = RedisCache()
+
+_ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+
+# --- 2. MONGODB ATLAS SETUP ---
+MONGO_URI = os.getenv("MONGODB_URI")
+_mongo_client = MongoClient(MONGO_URI)
+_mongo_db = _mongo_client["comparitor_db"]
+collection = _mongo_db["products"]
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Start the daily warmup scheduler on startup; stop it on shutdown."""
+    try:
+        from scheduler import start_scheduler
+        start_scheduler(cache=cache, mongo_collection=collection)
+    except Exception as _e:
+        print(f"⚠️  Scheduler failed to start: {_e}")
+    yield
+    try:
+        from scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
+
+
+app = FastAPI(title="Comparitor Aggregator", lifespan=_lifespan)
 
 
 def _int_env(name: str, default: int) -> int:
@@ -50,9 +79,88 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        val = float(raw)
+        return val if val > 0 else default
+    except Exception:
+        return default
+
+
 FAST_TTL_SECONDS = _int_env("REDIS_FAST_TTL_SECONDS", 10 * 60)
 FINAL_TTL_SECONDS = _int_env("REDIS_FINAL_TTL_SECONDS", 24 * 60 * 60)
 LOCK_TTL_SECONDS = _int_env("REDIS_LOCK_TTL_SECONDS", 10 * 60)
+
+SCRAPER_RETRY_MAX_ATTEMPTS = _int_env("SCRAPER_RETRY_MAX_ATTEMPTS", 3)
+SCRAPER_RETRY_BASE_DELAY_SECONDS = _float_env("SCRAPER_RETRY_BASE_DELAY_SECONDS", 1.0)
+SCRAPER_RETRY_MAX_DELAY_SECONDS = _float_env("SCRAPER_RETRY_MAX_DELAY_SECONDS", 10.0)
+
+
+def _is_retryable_error(err: Exception) -> bool:
+    msg = str(err).lower()
+    # Don't retry config mistakes
+    if "missing" in msg and "key" in msg:
+        return False
+    if "invalid api key" in msg:
+        return False
+
+    retry_markers = [
+        "timeout",
+        "timed out",
+        "rate limit",
+        "too many requests",
+        "429",
+        "quota",
+        "insufficient_quota",
+        "connection reset",
+        "connection aborted",
+        "network",
+        "502",
+        "503",
+        "504",
+        "gateway",
+        "server error",
+    ]
+    return any(m in msg for m in retry_markers)
+
+
+async def _run_with_retries(
+    *,
+    site_name: str,
+    fn: Callable[[], Awaitable[Any]],
+    retry_on_empty: bool = False,
+) -> List[dict]:
+    last_err: Optional[Exception] = None
+    for attempt in range(1, SCRAPER_RETRY_MAX_ATTEMPTS + 1):
+        try:
+            res = await fn()
+            if not isinstance(res, list):
+                raise RuntimeError(f"{site_name} returned {type(res).__name__} (expected list)")
+            # By default: do NOT treat 0 items as an error (could be a genuine no-results query)
+            if retry_on_empty and len(res) == 0:
+                raise RuntimeError(f"{site_name} returned 0 items")
+            return res
+        except Exception as e:
+            last_err = e
+
+            # Only retry on genuine transient errors (timeouts/429/quota/network)
+            if not _is_retryable_error(e):
+                break
+
+            if attempt >= SCRAPER_RETRY_MAX_ATTEMPTS:
+                break
+
+            delay = min(
+                SCRAPER_RETRY_MAX_DELAY_SECONDS,
+                SCRAPER_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+            )
+            print(f"⚠️ {site_name} retry {attempt}/{SCRAPER_RETRY_MAX_ATTEMPTS} after error: {e}")
+            await asyncio.sleep(delay)
+
+    raise RuntimeError(f"{site_name} failed after {attempt} attempts: {last_err}")
 
 
 def _bucket_dir() -> str:
@@ -60,30 +168,34 @@ def _bucket_dir() -> str:
     bucket = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
     return os.path.join("results", bucket.strftime("%Y%m%d_%H%M"))
 
-# --- 2. MONGODB ATLAS SETUP ---
-MONGO_URI = os.getenv("MONGODB_URI") 
-client = MongoClient(MONGO_URI)
-db = client["comparitor_db"]
-collection = db["products"]
 
 @app.get("/search")
 async def search_and_aggregate(q: str = Query(..., description="Product to search")):
     start_time = time.perf_counter()
     print(f"📡 Starting parallel search for: {q}")
-    
-    try:
-        results_batches = await asyncio.gather(
-            scrape_amazon(q),
-            scrape_flipkart(q),
-            scrape_jiomart(q),
-            scrape_meesho(q),
-            scrape_croma(q),
-            scrape_myntra(q),
-            return_exceptions=True 
-        )
-    except Exception as e:
-        print(f"❌ Aggregator Error: {e}")
-        raise HTTPException(status_code=500, detail="Error during parallel execution")
+
+    tasks = [
+        ("Amazon", _run_with_retries(site_name="Amazon", fn=lambda: scrape_amazon(q))),
+        ("Flipkart", _run_with_retries(site_name="Flipkart", fn=lambda: scrape_flipkart(q))),
+        ("JioMart", _run_with_retries(site_name="JioMart", fn=lambda: scrape_jiomart(q))),
+        ("Meesho", _run_with_retries(site_name="Meesho", fn=lambda: scrape_meesho(q))),
+        ("Croma", _run_with_retries(site_name="Croma", fn=lambda: scrape_croma(q))),
+        ("Myntra", _run_with_retries(site_name="Myntra", fn=lambda: scrape_myntra(q))),
+    ]
+
+    results_batches = await asyncio.gather(
+        *[t[1] for t in tasks],
+        return_exceptions=True,
+    )
+
+    failures = {}
+    for (site_name, _), batch in zip(tasks, results_batches):
+        if isinstance(batch, Exception):
+            failures[site_name] = str(batch)
+
+    # Less strict: return partial results if possible, but include per-site errors
+    if failures:
+        print(f"⚠️ Some scrapers failed (returning partial results): {failures}")
 
     # --- 3. FLATTEN EVERYTHING CAREFULLY ---
     all_products = []
@@ -96,6 +208,15 @@ async def search_and_aggregate(q: str = Query(..., description="Product to searc
             print(f"⚠️ Batch {i} failed or returned no list: {batch}")
 
     if not all_products:
+        # If everything failed, surface the failures (otherwise it's ambiguous)
+        if failures:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "No results returned (all scrapers failed or returned empty).",
+                    "failures": failures,
+                },
+            )
         return {"status": "no_results", "data": []}
 
     # --- 4. SAVE TO SINGLE JSON FILE (TOTAL DATA) ---
@@ -131,11 +252,12 @@ async def search_and_aggregate(q: str = Query(..., description="Product to searc
 
     elapsed = time.perf_counter() - start_time
     return {
-        "status": "success",
+        "status": "success" if not failures else "partial_success",
         "total_results": len(enriched_data),
         "file_saved": filename,
         "elapsed_seconds": round(elapsed, 3),
-        "results": enriched_data
+        "results": enriched_data,
+        "site_errors": failures,
     }
 
 @app.get("/search_fast")
@@ -146,7 +268,8 @@ async def search_fast(
     start_time = time.perf_counter()
     q_norm = normalize_query(q)
 
-    cached = await get_cached_results(q=q, cache=cache)
+    # --- Robust cache lookup (tries variant forms before going to scrapers) ---
+    cached = await get_cached_results_robust(q=q, cache=cache)
     if cached.get("stage") == "final" and isinstance(cached.get("results"), list):
         elapsed = time.perf_counter() - start_time
         return {
@@ -154,6 +277,7 @@ async def search_fast(
             "mode": "final_cache",
             "query": q,
             "query_normalized": q_norm,
+            "matched_variant": cached.get("matched_variant"),
             "total_results": len(cached["results"]),
             "elapsed_seconds": round(elapsed, 3),
             "results": cached["results"],
@@ -177,18 +301,47 @@ async def search_fast(
             "mode": "fast_cache",
             "query": q,
             "query_normalized": q_norm,
+            "matched_variant": cached.get("matched_variant"),
             "total_results": len(cached["results"]),
             "elapsed_seconds": round(elapsed, 3),
             "results": cached["results"],
         }
 
-    # No cache: run only the 4 non-LLM scrapers first
+    # --- Concurrency hardening: acquire the lock HERE (before touching scrapers) ---
+    # If another request is already scraping the same query, return 202 immediately
+    # instead of launching a duplicate scraping run.
+    lock_key = f"comparitor:search:lock:{q_norm}"
+    got_lock = await cache.acquire_lock(lock_key, ttl_seconds=LOCK_TTL_SECONDS)
+    if not got_lock:
+        # Another worker is already running; tell the caller to poll /search_status
+        return {
+            "status": "processing",
+            "mode": "locked",
+            "query": q,
+            "query_normalized": q_norm,
+            "message": "A scraping run for this query is already in progress. Poll /search_status for updates.",
+            "retry_after": 5,
+        }
+
+    # We hold the lock — proceed with fast scrapers
     await cache.set_status(
         f"comparitor:search:status:{q_norm}",
         "running_fast",
         ttl_seconds=FAST_TTL_SECONDS,
     )
-    fast_results = await run_fast_scrapers(q)
+    fast_results, fast_errors = await run_fast_scrapers_with_errors(q)
+
+    # Only fail the endpoint if we literally got nothing from the fast phase
+    if not fast_results and fast_errors:
+        await cache.set_status(
+            f"comparitor:search:status:{q_norm}",
+            "failed",
+            ttl_seconds=FAST_TTL_SECONDS,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "Fast scrapers returned no results.", "failures": fast_errors},
+        )
 
     await cache.set_json(
         f"comparitor:search:fast:{q_norm}",
@@ -201,7 +354,8 @@ async def search_fast(
         ttl_seconds=FINAL_TTL_SECONDS,
     )
 
-    # Continue in background: run LLM scrapers, merge, write JSON, save to Atlas, cache final
+    # Continue in background: run LLM scrapers, merge, write JSON, save to Atlas, cache final.
+    # Pass lock_already_acquired=True so the background task skips re-acquiring the lock.
     background_tasks.add_task(
         background_complete_and_persist,
         q=q,
@@ -211,6 +365,7 @@ async def search_fast(
         fast_ttl_seconds=FAST_TTL_SECONDS,
         final_ttl_seconds=FINAL_TTL_SECONDS,
         lock_ttl_seconds=LOCK_TTL_SECONDS,
+        lock_already_acquired=True,
     )
 
     elapsed = time.perf_counter() - start_time
@@ -222,6 +377,7 @@ async def search_fast(
         "total_results": len(fast_results),
         "elapsed_seconds": round(elapsed, 3),
         "results": fast_results,
+        "site_errors": fast_errors,
     }
 
 
@@ -319,6 +475,51 @@ async def search_status(q: str = Query(..., description="Product to search")):
         "has_fast": has_fast,
         "has_final": has_final,
     }
+
+
+def _require_admin_key(x_admin_key: str = Header(default="")) -> None:
+    """Dependency: reject requests that don't carry the correct X-Admin-Key header."""
+    if not _ADMIN_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin endpoints are disabled. Set ADMIN_API_KEY in your environment.",
+        )
+    if x_admin_key != _ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden: invalid admin key.")
+
+
+@app.post("/admin/warmup/trigger")
+async def admin_trigger_warmup(
+    background_tasks: BackgroundTasks,
+    x_admin_key: str = Header(default=""),
+):
+    """Manually trigger the warmup job in the background (admin only)."""
+    _require_admin_key(x_admin_key)
+
+    from scheduler.jobs import run_warmup_job
+    background_tasks.add_task(run_warmup_job, cache=cache, mongo_collection=collection)
+    return {"status": "triggered", "message": "Warmup job started in background."}
+
+
+@app.get("/admin/warmup/status")
+async def admin_warmup_status(x_admin_key: str = Header(default="")):
+    """Return the last warmup run's metrics and scheduler state (admin only)."""
+    _require_admin_key(x_admin_key)
+
+    from scheduler.metrics import get_last_run_metrics
+    from scheduler.background import get_scheduler_info
+    from scheduler.idempotency import is_warmup_done_today
+
+    metrics = await get_last_run_metrics(cache)
+    done_today = await is_warmup_done_today(cache)
+    scheduler_info = get_scheduler_info()
+
+    return {
+        "done_today": done_today,
+        "scheduler": scheduler_info,
+        "last_run": metrics,
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
