@@ -284,17 +284,10 @@ async def search_fast(
         }
 
     if cached.get("stage") == "fast" and isinstance(cached.get("results"), list):
-        background_tasks.add_task(
-            background_complete_and_persist,
-            q=q,
-            cache=cache,
-            mongo_collection=collection,
-            fast_results=cached["results"],
-            fast_ttl_seconds=FAST_TTL_SECONDS,
-            final_ttl_seconds=FINAL_TTL_SECONDS,
-            lock_ttl_seconds=LOCK_TTL_SECONDS,
-        )
-
+        # Fast cache hit means a scraping pipeline is already running from the original
+        # request that populated this key. Never re-launch background here — doing so
+        # causes duplicate scraping every time the same (or variant) query is repeated
+        # within the fast-cache TTL window.
         elapsed = time.perf_counter() - start_time
         return {
             "status": "partial",

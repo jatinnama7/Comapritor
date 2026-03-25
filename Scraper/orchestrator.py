@@ -232,8 +232,7 @@ async def get_cached_results_robust(
         final_key = f"comparitor:search:final:{variant}"
         fast_key = f"comparitor:search:fast:{variant}"
         status_key = f"comparitor:search:status:{variant}"
-
-        final = await cache.get_json(final_key)
+                                                                                                                                
         if isinstance(final, list) and final:
             return {"stage": "final", "results": final, "status": "complete", "matched_variant": variant}
 

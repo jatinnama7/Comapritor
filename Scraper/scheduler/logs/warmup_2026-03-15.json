@@ -1,0 +1,13 @@
+{
+  "run_date": "2026-03-15",
+  "started_at": "2026-03-15T12:50:51.648952+05:30",
+  "finished_at": "2026-03-15T13:45:10.111208+05:30",
+  "total_queries": 100,
+  "succeeded": 100,
+  "failed": 0,
+  "skipped_cached": 0,
+  "errors": [],
+  "llm_provider_used": "",
+  "used_static_fallback": true,
+  "duration_seconds": 3258.45
+}

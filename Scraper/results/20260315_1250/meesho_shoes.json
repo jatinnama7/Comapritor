@@ -1,0 +1,29 @@
+[
+    {
+        "index": 0,
+        "error": true,
+        "tags": [
+            "error"
+        ],
+        "content": "litellm.NotFoundError: NotFoundError: CerebrasException - Model gpt-oss-120b does not exist or you do not have access to it.",
+        "source": "Meesho"
+    },
+    {
+        "index": 1,
+        "error": true,
+        "tags": [
+            "error"
+        ],
+        "content": "litellm.NotFoundError: NotFoundError: CerebrasException - Model gpt-oss-120b does not exist or you do not have access to it.",
+        "source": "Meesho"
+    },
+    {
+        "index": 2,
+        "error": true,
+        "tags": [
+            "error"
+        ],
+        "content": "litellm.NotFoundError: NotFoundError: CerebrasException - Model gpt-oss-120b does not exist or you do not have access to it.",
+        "source": "Meesho"
+    }
+]
