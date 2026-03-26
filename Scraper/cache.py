@@ -1,5 +1,8 @@
 import json
+import logging
 import os
+import time
+from urllib.parse import urlsplit, urlunsplit
 from typing import Any, Optional
 
 try:
@@ -11,28 +14,78 @@ except Exception:  # pragma: no cover
 _DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
 
+def _safe_redis_url(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        if "@" not in parts.netloc:
+            return url
+        auth, host = parts.netloc.rsplit("@", 1)
+        if ":" in auth:
+            user, _pwd = auth.split(":", 1)
+            safe_auth = f"{user}:***"
+        else:
+            safe_auth = "***"
+        return urlunsplit((parts.scheme, f"{safe_auth}@{host}", parts.path, parts.query, parts.fragment))
+    except Exception:
+        return "redis://***"
+
+
 class RedisCache:
     def __init__(self, url: Optional[str] = None):
         self._url = url or os.getenv("REDIS_URL") or _DEFAULT_REDIS_URL
         self._client = None
         self._available: Optional[bool] = None
+        self._last_ping_at: float = 0.0
+        self._recheck_seconds: float = 5.0
+        self._logger = logging.getLogger("comparitor.cache")
+        self._safe_url = _safe_redis_url(self._url)
 
     async def _get_client(self):
         if redis is None:
+            if self._available is not False:
+                self._logger.warning("redis_client=unavailable reason=redis_package_missing")
             self._available = False
             return None
 
         if self._client is None:
             self._client = redis.from_url(self._url, encoding="utf-8", decode_responses=True)
 
-        if self._available is None:
+        now = time.monotonic()
+        should_ping = (
+            self._available is None
+            or self._available is True
+            or (now - self._last_ping_at) >= self._recheck_seconds
+        )
+
+        if should_ping:
             try:
                 await self._client.ping()
+                was_available = self._available
                 self._available = True
-            except Exception:
+                self._last_ping_at = now
+                if was_available is not True:
+                    self._logger.info("redis_client=connected url=%s", self._safe_url)
+            except Exception as exc:
+                was_available = self._available
                 self._available = False
+                self._last_ping_at = now
+                if was_available is not False:
+                    self._logger.warning("redis_client=unreachable url=%s error=%s", self._safe_url, exc)
 
         return self._client if self._available else None
+
+    async def health_check(self) -> dict:
+        """Return a lightweight Redis connectivity status for startup diagnostics."""
+        client = await self._get_client()
+        if client is None:
+            return {"available": False, "url": self._safe_url, "error": "redis_unavailable"}
+
+        try:
+            await client.ping()
+            return {"available": True, "url": self._safe_url}
+        except Exception as exc:
+            self._available = False
+            return {"available": False, "url": self._safe_url, "error": str(exc)}
 
     async def get_json(self, key: str) -> Optional[Any]:
         client = await self._get_client()

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import sys
 import urllib.parse
@@ -35,6 +36,58 @@ from orchestrator import (
 
 load_dotenv()
 
+
+_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+_ENABLE_COLOR_LOGS = os.getenv("ENABLE_COLOR_LOGS", "1") == "1"
+_SHOW_LOGGER_NAME = os.getenv("SHOW_LOGGER_NAME", "0") == "1"
+
+
+class _ColorFormatter(logging.Formatter):
+    _RESET = "\x1b[0m"
+    _LEVEL_META = {
+        logging.DEBUG: ("🐞", "DEBUG", "\x1b[36m"),
+        logging.INFO: ("✨", "INFO", "\x1b[32m"),
+        logging.WARNING: ("⚠️", "WARNING", "\x1b[33m"),
+        logging.ERROR: ("❌", "ERROR", "\x1b[31m"),
+        logging.CRITICAL: ("💥", "CRITICAL", "\x1b[41;97m"),
+    }
+    default_time_format = "%H:%M:%S"
+
+    def format(self, record: logging.LogRecord) -> str:
+        icon, level_tag, color = self._LEVEL_META.get(record.levelno, ("•", "LOG", ""))
+        msg = record.getMessage()
+        ts = self.formatTime(record, self.default_time_format)
+        logger_name = f" [{record.name}]" if _SHOW_LOGGER_NAME else ""
+        text = f"{ts} {icon} {level_tag}{logger_name} {msg}"
+        if record.exc_info:
+            text = f"{text}\n{self.formatException(record.exc_info)}"
+
+        if not _ENABLE_COLOR_LOGS or os.getenv("NO_COLOR"):
+            return text
+        if not sys.stdout.isatty() and os.getenv("FORCE_COLOR", "0") != "1":
+            return text
+        if not color:
+            return text
+        return f"{color}{text}{self._RESET}"
+
+
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(
+    _ColorFormatter("%(message)s")
+)
+
+_root_logger = logging.getLogger()
+_root_logger.handlers.clear()
+_root_logger.addHandler(_log_handler)
+_root_logger.setLevel(getattr(logging, _LOG_LEVEL, logging.INFO))
+
+# Keep startup/application logs clean by reducing noisy third-party loggers.
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("pymongo").setLevel(logging.WARNING)
+
+logger = logging.getLogger("comparitor.api")
+
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
@@ -49,18 +102,51 @@ _mongo_db = _mongo_client["comparitor_db"]
 collection = _mongo_db["products"]
 
 
+async def _log_startup_diagnostics() -> None:
+    logger.info("[STARTUP] service=comparitor_aggregator")
+    logger.info("[RUNTIME] python=%s platform=%s", sys.version.split()[0], sys.platform)
+    logger.info(
+        "[CONFIG] ttl_fast=%s ttl_final=%s ttl_lock=%s retry_attempts=%s retry_base_delay=%s retry_max_delay=%s",
+        FAST_TTL_SECONDS,
+        FINAL_TTL_SECONDS,
+        LOCK_TTL_SECONDS,
+        SCRAPER_RETRY_MAX_ATTEMPTS,
+        SCRAPER_RETRY_BASE_DELAY_SECONDS,
+        SCRAPER_RETRY_MAX_DELAY_SECONDS,
+    )
+
+    redis_health = await cache.health_check()
+    if redis_health.get("available"):
+        logger.info("[REDIS] status=connected url=%s", redis_health.get("url"))
+    else:
+        logger.warning(
+            "[REDIS] status=unavailable url=%s error=%s",
+            redis_health.get("url"),
+            redis_health.get("error", "unknown"),
+        )
+
+    try:
+        _mongo_client.admin.command("ping")
+        logger.info("[MONGODB] status=connected db=%s collection=%s", _mongo_db.name, collection.name)
+    except Exception as exc:
+        logger.warning("[MONGODB] status=unavailable error=%s", exc)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Start the daily warmup scheduler on startup; stop it on shutdown."""
+    await _log_startup_diagnostics()
     try:
         from scheduler import start_scheduler
         start_scheduler(cache=cache, mongo_collection=collection)
+        logger.info("[SCHEDULER] status=started")
     except Exception as _e:
-        print(f"⚠️  Scheduler failed to start: {_e}")
+        logger.warning("[SCHEDULER] status=failed error=%s", _e)
     yield
     try:
         from scheduler import stop_scheduler
         stop_scheduler()
+        logger.info("[SCHEDULER] status=stopped")
     except Exception:
         pass
 
@@ -93,10 +179,65 @@ def _float_env(name: str, default: float) -> float:
 FAST_TTL_SECONDS = _int_env("REDIS_FAST_TTL_SECONDS", 10 * 60)
 FINAL_TTL_SECONDS = _int_env("REDIS_FINAL_TTL_SECONDS", 24 * 60 * 60)
 LOCK_TTL_SECONDS = _int_env("REDIS_LOCK_TTL_SECONDS", 10 * 60)
+MONGO_FALLBACK_MAX_AGE_MINUTES = _int_env("MONGO_FALLBACK_MAX_AGE_MINUTES", 30)
 
 SCRAPER_RETRY_MAX_ATTEMPTS = _int_env("SCRAPER_RETRY_MAX_ATTEMPTS", 3)
 SCRAPER_RETRY_BASE_DELAY_SECONDS = _float_env("SCRAPER_RETRY_BASE_DELAY_SECONDS", 1.0)
 SCRAPER_RETRY_MAX_DELAY_SECONDS = _float_env("SCRAPER_RETRY_MAX_DELAY_SECONDS", 10.0)
+
+
+def _mongo_results_for_query(q: str) -> tuple[list, Optional[str]]:
+    """Fetch the latest persisted Mongo run for the query and return (results, created_at)."""
+    latest = collection.find_one({"search_query": q}, sort=[("created_at", -1)])
+    if not latest:
+        return [], None
+
+    run_id = latest.get("run_id")
+    created_at = latest.get("created_at")
+    results = []
+
+    if run_id:
+        cursor = collection.find({"search_query": q, "run_id": run_id}, {"_id": 0})
+        results = list(cursor)
+    elif created_at:
+        cursor = collection.find({"search_query": q, "created_at": created_at}, {"_id": 0})
+        results = list(cursor)
+
+        if len(results) < 3:
+            try:
+                dt = datetime.fromisoformat(created_at)
+                start = (dt - timedelta(seconds=2)).isoformat()
+                end = (dt + timedelta(seconds=2)).isoformat()
+                cursor = collection.find(
+                    {"search_query": q, "created_at": {"$gte": start, "$lte": end}},
+                    {"_id": 0},
+                )
+                results = list(cursor)
+            except Exception:
+                pass
+
+    return results, created_at
+
+
+def _created_at_age_minutes(created_at: Optional[str]) -> Optional[float]:
+    if not created_at:
+        return None
+    try:
+        dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            age = datetime.now(dt.tzinfo) - dt
+        else:
+            age = datetime.utcnow() - dt
+        return age.total_seconds() / 60.0
+    except Exception:
+        return None
+
+
+def _is_fresh_mongo(created_at: Optional[str], max_age_minutes: int) -> tuple[bool, Optional[float]]:
+    age_minutes = _created_at_age_minutes(created_at)
+    if age_minutes is None:
+        return False, None
+    return age_minutes <= max_age_minutes, age_minutes
 
 
 def _is_retryable_error(err: Exception) -> bool:
@@ -157,7 +298,7 @@ async def _run_with_retries(
                 SCRAPER_RETRY_MAX_DELAY_SECONDS,
                 SCRAPER_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
             )
-            print(f"⚠️ {site_name} retry {attempt}/{SCRAPER_RETRY_MAX_ATTEMPTS} after error: {e}")
+            logger.warning("retry site=%s attempt=%s/%s error=%s", site_name, attempt, SCRAPER_RETRY_MAX_ATTEMPTS, e)
             await asyncio.sleep(delay)
 
     raise RuntimeError(f"{site_name} failed after {attempt} attempts: {last_err}")
@@ -172,7 +313,7 @@ def _bucket_dir() -> str:
 @app.get("/search")
 async def search_and_aggregate(q: str = Query(..., description="Product to search")):
     start_time = time.perf_counter()
-    print(f"📡 Starting parallel search for: {q}")
+    logger.info("search start q=%s", q)
 
     tasks = [
         ("Amazon", _run_with_retries(site_name="Amazon", fn=lambda: scrape_amazon(q))),
@@ -195,17 +336,17 @@ async def search_and_aggregate(q: str = Query(..., description="Product to searc
 
     # Less strict: return partial results if possible, but include per-site errors
     if failures:
-        print(f"⚠️ Some scrapers failed (returning partial results): {failures}")
+        logger.warning("search partial_failures=%s", failures)
 
     # --- 3. FLATTEN EVERYTHING CAREFULLY ---
     all_products = []
     for i, batch in enumerate(results_batches):
         if isinstance(batch, list):
             limited = batch[:10]
-            print(f"📦 Batch {i} returned {len(limited)} items")
+            logger.info("search batch=%s items=%s", i, len(limited))
             all_products.extend(limited)
         else:
-            print(f"⚠️ Batch {i} failed or returned no list: {batch}")
+            logger.warning("search batch=%s failed=%s", i, batch)
 
     if not all_products:
         # If everything failed, surface the failures (otherwise it's ambiguous)
@@ -226,7 +367,7 @@ async def search_and_aggregate(q: str = Query(..., description="Product to searc
     out_path = os.path.join(out_dir, filename)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(all_products, f, indent=4)
-    print(f"📁 Local JSON saved: {out_path} with {len(all_products)} items.")
+    logger.info("search saved file=%s items=%s", out_path, len(all_products))
 
     # --- 5. PREPARE & UPLOAD TO MONGODB ---
     # Create a deep copy for MongoDB to avoid modifying the original list prematurely
@@ -242,13 +383,13 @@ async def search_and_aggregate(q: str = Query(..., description="Product to searc
         if enriched_data:
             # PUSH TOTAL DATA
             collection.insert_many(enriched_data)
-            print(f"💾 Successfully uploaded {len(enriched_data)} total items to MongoDB Atlas.")
+            logger.info("mongo uploaded items=%s", len(enriched_data))
             
             # Remove the ObjectId before returning to FastAPI
             for item in enriched_data:
                 item.pop('_id', None)
     except Exception as e:
-        print(f"⚠️ MongoDB Upload Failed: {e}")
+        logger.warning("mongo upload_failed error=%s", e)
 
     elapsed = time.perf_counter() - start_time
     return {
@@ -275,6 +416,8 @@ async def search_fast(
         return {
             "status": "success",
             "mode": "final_cache",
+            "data_source": "redis_final",
+            "fallback_used": False,
             "query": q,
             "query_normalized": q_norm,
             "matched_variant": cached.get("matched_variant"),
@@ -292,6 +435,8 @@ async def search_fast(
         return {
             "status": "partial",
             "mode": "fast_cache",
+            "data_source": "redis_fast",
+            "fallback_used": False,
             "query": q,
             "query_normalized": q_norm,
             "matched_variant": cached.get("matched_variant"),
@@ -299,6 +444,34 @@ async def search_fast(
             "elapsed_seconds": round(elapsed, 3),
             "results": cached["results"],
         }
+
+    # Redis miss/unavailable path: fallback to Mongo only if result is still fresh.
+    mongo_results, mongo_created_at = _mongo_results_for_query(q)
+    if mongo_results:
+        is_fresh, age_minutes = _is_fresh_mongo(mongo_created_at, MONGO_FALLBACK_MAX_AGE_MINUTES)
+        if is_fresh:
+            # Best-effort backfill Redis final cache for subsequent calls.
+            await cache.set_json(
+                f"comparitor:search:final:{q_norm}",
+                mongo_results,
+                ttl_seconds=FINAL_TTL_SECONDS,
+            )
+
+            elapsed = time.perf_counter() - start_time
+            return {
+                "status": "success",
+                "mode": "mongo_fallback_fresh",
+                "data_source": "mongo_fallback",
+                "fallback_used": True,
+                "query": q,
+                "query_normalized": q_norm,
+                "total_results": len(mongo_results),
+                "mongo_created_at": mongo_created_at,
+                "mongo_age_minutes": round(age_minutes, 3) if age_minutes is not None else None,
+                "freshness_window_minutes": MONGO_FALLBACK_MAX_AGE_MINUTES,
+                "elapsed_seconds": round(elapsed, 3),
+                "results": mongo_results,
+            }
 
     # --- Concurrency hardening: acquire the lock HERE (before touching scrapers) ---
     # If another request is already scraping the same query, return 202 immediately
@@ -310,6 +483,8 @@ async def search_fast(
         return {
             "status": "processing",
             "mode": "locked",
+            "data_source": "none",
+            "fallback_used": False,
             "query": q,
             "query_normalized": q_norm,
             "message": "A scraping run for this query is already in progress. Poll /search_status for updates.",
@@ -365,6 +540,8 @@ async def search_fast(
     return {
         "status": "partial",
         "mode": "fast_fresh",
+        "data_source": "fresh_scrape",
+        "fallback_used": False,
         "query": q,
         "query_normalized": q_norm,
         "total_results": len(fast_results),
@@ -384,60 +561,57 @@ async def search_final(q: str = Query(..., description="Product to search")):
         return {
             "status": "success",
             "mode": "final_cache",
+            "data_source": "redis_final",
+            "fallback_used": False,
             "query": q,
             "query_normalized": q_norm,
             "total_results": len(cached_final),
             "results": cached_final,
         }
 
-    # Fallback to MongoDB: fetch the most recent saved run for this query
-    latest = collection.find_one({"search_query": q}, sort=[("created_at", -1)])
-    if not latest:
+    # Fallback to MongoDB only when data is fresh enough (option 2).
+    results, created_at = _mongo_results_for_query(q)
+    if not results:
         return {
             "status": "not_found",
             "mode": "mongo_empty",
+            "data_source": "none",
+            "fallback_used": True,
             "query": q,
             "query_normalized": q_norm,
             "total_results": 0,
             "results": [],
         }
 
-    run_id = latest.get("run_id")
-    results = []
+    is_fresh, age_minutes = _is_fresh_mongo(created_at, MONGO_FALLBACK_MAX_AGE_MINUTES)
+    if not is_fresh:
+        return {
+            "status": "not_found",
+            "mode": "mongo_stale",
+            "data_source": "none",
+            "fallback_used": True,
+            "query": q,
+            "query_normalized": q_norm,
+            "total_results": 0,
+            "freshness_window_minutes": MONGO_FALLBACK_MAX_AGE_MINUTES,
+            "mongo_created_at": created_at,
+            "mongo_age_minutes": round(age_minutes, 3) if age_minutes is not None else None,
+            "results": [],
+        }
 
-    if run_id:
-        cursor = collection.find({"search_query": q, "run_id": run_id}, {"_id": 0})
-        results = list(cursor)
-    else:
-        # Backward compatibility with older inserts that didn't include run_id
-        created_at = latest.get("created_at")
-        if created_at:
-            cursor = collection.find({"search_query": q, "created_at": created_at}, {"_id": 0})
-            results = list(cursor)
-
-            # If timestamps were unique per item, broaden to a small time window
-            if len(results) < 3:
-                try:
-                    dt = datetime.fromisoformat(created_at)
-                    start = (dt - timedelta(seconds=2)).isoformat()
-                    end = (dt + timedelta(seconds=2)).isoformat()
-                    cursor = collection.find(
-                        {"search_query": q, "created_at": {"$gte": start, "$lte": end}},
-                        {"_id": 0},
-                    )
-                    results = list(cursor)
-                except Exception:
-                    pass
-
-    if results:
-        # Best-effort: populate Redis final cache for subsequent calls
-        await cache.set_json(final_key, results, ttl_seconds=FINAL_TTL_SECONDS)
+    # Best-effort: populate Redis final cache for subsequent calls.
+    await cache.set_json(final_key, results, ttl_seconds=FINAL_TTL_SECONDS)
 
     return {
-        "status": "success" if results else "not_found",
-        "mode": "mongo",
+        "status": "success",
+        "mode": "mongo_fallback_fresh",
+        "data_source": "mongo_fallback",
+        "fallback_used": True,
         "query": q,
         "query_normalized": q_norm,
+        "freshness_window_minutes": MONGO_FALLBACK_MAX_AGE_MINUTES,
+        "mongo_created_at": created_at,
+        "mongo_age_minutes": round(age_minutes, 3) if age_minutes is not None else None,
         "total_results": len(results),
         "results": results,
     }
@@ -516,5 +690,6 @@ async def admin_warmup_status(x_admin_key: str = Header(default="")):
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Comparitor Aggregator is running on http://localhost:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = _int_env("PORT", 8090)
+    logger.info("View docs at: http://localhost:%s/docs", port)
+    uvicorn.run(app, host="0.0.0.0", port=port, access_log=False)
